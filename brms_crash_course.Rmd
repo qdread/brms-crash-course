@@ -12,9 +12,28 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-# Summary
+# Introduction
 
-# Setup
+What is this course? It is a crash course in **brms**: a brief and practical introduction to fitting Bayesian multilevel models in R and Stan using the [**brms**](https://paul-buerkner.github.io/brms/) package (**B**ayesian **R**egression **M**odels using **S**tan). Because this is intended as a practical skills course, I will only give a quick and surface-level description of Bayesian analysis and how it can be used for multilevel regression models.
+
+## What is Bayesian analysis?
+
+Laplace and Reverend Bayes independently invneted it
+
+## What is Stan?
+
+Andrew Gelman and colleagues developed
+
+## What is brms?
+
+Paul Buerkner developed
+
+## Why use it?
+
+- Philosophical reasons
+- Math reasons
+
+# Installing brms
 
 ```{r load packages}
 
@@ -28,3 +47,22 @@ theme_set(
           strip.background = element_blank())
 )
 ```
+
+# Resources
+
+Here are some links to tutorials and lessons for learning basic Bayesian statistics with **brms**.
+
+- [Building a multilevel model in brms](https://www.rensvandeschoot.com/tutorials/brms-started/) by Rens van de Schoot
+- [An introduction to Bayesian multilevel models using brms](https://www.barelysignificant.com/phd_thesis/appendix-brms.html) by Ladislas Nalborczyk
+
+Paul Buerkner published two papers on **brms**:
+
+- [Buerkner 2017, Journal of Statistical Software](https://www.jstatsoft.org/article/view/v080i01)
+- [Buerkner 2018, The R Journal](https://journal.r-project.org/archive/2018/RJ-2018-017/index.html)
+
+# Alternatives
+
+- rstanarm
+- MCMCglmm
+- PyStan (other platforms for Stan)
+- CmdStan
