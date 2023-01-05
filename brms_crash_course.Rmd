@@ -107,11 +107,7 @@ library(easystats)
 Set a plotting theme.
 
 ```{r ggplot theme}
-theme_set(
-  theme_bw() + 
-    theme(panel.grid = element_blank(),
-          strip.background = element_blank())
-)
+theme_set(theme_minimal())
 ```
 
 Set **brms** options. The option `brms.backend = 'cmdstanr'` means we want to use CmdStanR as a backend to run the **brms** models, instead of the default backend. If you were unable to install CmdStan correctly, omit the `brms.backend = 'cmdstanr'` part. The option `mc.cores = 4` means we will use four processor cores in parallel to fit the models, meaning we can allow four Markov chains to sample simultaneously.
@@ -120,10 +116,130 @@ Set **brms** options. The option `brms.backend = 'cmdstanr'` means we want to us
 options(brms.backend = 'cmdstanr', mc.cores = 4)
 ```
 
-Read the data. It is hosted on the GitHub repository for this course.
+## The data
+
+Read the data CSV to a data frame. It is hosted on the GitHub repository for this course.
 
 ```{r}
 popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
+```
+
+Examine the data. These are simulated (i.e., fake) data that could have come from a study exploring what characteristics predict popularity of a student.
+
+```{r}
+glimpse(popular2data)
+```
+
+There are quite a few columns but we only need to be concerned with a few:
+
+- `pupil`: a numeric ID for each individual (1-26). Note that the IDs are "recycled" within each class. For example pupil 1 in class 1 is not the same person as pupil 1 in class 2.
+- `class`: a numeric ID for each class (1-100). 
+- `extrov`: a numerical score for extroversion, or how outgoing each individual is (1-10).
+- `sex`: a binary variable (0 = boy, 1 = girl).
+- `texp`: a numerical score for teacher experience level (2-25).
+- `popular`: a continuous score (0-10) of the popularity of each individual student. This is the outcome variable we are interested in explaining. 
+
+In studies of this kind, the popularity score is obtained by having each student in the class rate all other students on their popularity, then averaging the score each student received. Therefore we might expect there to be a strong effect of class on the mean popularity rating, as well as the relationship between extroversion and popularity. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
+
+# Exploratory plots
+
+Let's take a look at the relationship between extroversion and popularity. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because extroversion only has integer values.
+
+```{r}
+(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrov, y = popular)) +
+  geom_point(size = 1.2,
+             alpha = .8,
+             position = position_jitter(width = .2, height = 0)) +
+  ggtitle('Popularity vs. Extroversion'))
+```
+
+Right now, this completely ignores the multilevel structure of the dataset. The popularity scores of pupils from the same class are not independent of one another. So far, ignoring that wrinkle, we can use the eyeball test to see that there is a moderately strong positive relationship between popularity and extroversion.
+
+We can add a regression trendline to the plot. This is a simple least squares linear regression line that ignores the nestedness of pupils within classes. Plotting simplified models in this way is fine to guide the eye for exploratory purposes.
+
+```{r}
+pop_vs_ext +
+  geom_smooth(method = lm, se = FALSE) +
+  ggtitle('Popularity vs. Extroversion', subtitle = 'overall trendline')
+```
+
+This further supports our intuition that more outgoing students tend to be more popular.
+
+Now let's start to take the nested structure of the data into account. Color the points in the scatterplot based on which class (from 1 to 100) each pupil is in.
+
+```{r}
+(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrov, y = popular, color = class, group = class)) +
+   geom_point(size = 1.2,
+              alpha = .8,
+              position = position_jitter(width = .2, height = 0)) +
+   theme(legend.position = 'none') +
+   scale_color_distiller(palette = 'Set1') +
+   ggtitle('Popularity vs. Extroversion', 'points colored by class'))
+```
+
+It's hard to visually separate the classes, because there are 100 of them and they largely overlap. Let's add different regression lines for each class. This is equivalent to fitting a separate linear model to each class. 
+
+```{r}
+pop_vs_ext_colored + 
+  geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
+  ggtitle('Popularity vs. Extroversion', 'trendline by class')
+```
+
+You can see that the relationship between popularity and extroversion varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between classes.
+
+Here is a final exploratory plot that highlights the classes with the most extreme trends. The trendlines classes with the three highest slopes are plotted in blue, and the three lowest slopes in red. (This requires writing some code to pre-calculate the slopes and then modifying the plotting code to change the colors of the lines with the most extreme slopes).
+
+```{r}
+popular2data %>%
+  group_by(class) %>%
+  mutate(slope = lm(popular ~ extrov)$coefficients[2]) %>%
+  ungroup %>%
+  mutate(high_or_low = case_when(
+    slope >= sort(unique(slope))[98] ~ 'high',
+    slope <= sort(unique(slope))[3] ~ 'low',
+    TRUE ~ 'mid'
+  )) %>%
+  ggplot(aes(x = extrov, y = popular, group = class)) +
+  geom_point(size = 1.2,
+              alpha = .8,
+              position = position_jitter(width = .2, height = 0)) +
+  geom_smooth(aes(color = high_or_low, size = high_or_low), 
+              method = lm, se = FALSE) +
+  theme(legend.position = 'none') +
+  scale_color_manual(values = c(high = 'blue', low = 'red', mid = 'gray50')) +
+  scale_size_manual(values = c(high = 1.2, low = 1.2, mid = 0.6)) +
+  ggtitle('Popularity vs. Extroversion', 'highlighting 6 classes with most extreme relationship')
+```
+
+# Fitting models
+
+## Intercept-only model
+
+If you have ever fit a mixed model using the R package `lme4`, this will look familiar to you:
+
+```{r, eval = FALSE}
+lmer(popular ~ 1 + (1 | class), data = popular2data)
+```
+
+That is the syntax for fitting a mixed-effects model with the only fixed effect being the intercept (`1`) and a random intercept fit to each class. In the `lme4` package, the random effects specification has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`. In this case, `(1 | class)`, the `1` on the design side means only fit random intercepts and no random slopes, and the `class` on the group side means the groups that each get their own intercept are defined by the `class` variable.
+
+The beauty of **brms** is that it allows you to fit a Bayesian multilevel model with very similar syntax to the frequentist **lme4**. Instead of getting maximum likelihood point estimates of the model parameters (the fixed and random effects), we're going to get posterior distributions for all of them! Get hyped!!! 
+
+But to do this we need to give a few extra directions to the Hamiltonian Monte Carlo sampling algorithm:
+
+- How many chains should run?
+- How many iterations should each chain run in total?
+- How many iterations should be used for the initial warmup phase (these are not included in the final posterior distribution)?
+- What are the initial values for the parameters?
+
+If we don't specify any of these, **brms** will use default values for number of chains and iterations, and it will assign random values for the initial values. 
+
+You may notice I have made no mention of priors yet. Another great thing about **brms** is that if you do not specify priors, it will assign uninformative priors that are at least plausible for each of the parameters. (For example, if the parameter is a variance parameter that must be positive, it will assign a prior distribution that is truncated at zero). This can be a great time saver but it can also be a dangerous thing. We will revisit priors later. For now we will skip specifying the priors and use the defaults.
+
+Without further ado, here is our first Bayesian multilevel model!
+
+```{r}
+
 ```
 
 
