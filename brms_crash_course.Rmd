@@ -33,13 +33,37 @@ This course is designed for practicing researchers who have some experience with
 
 If you don't know what those packages are, don't sweat it because you can just follow along by copying the code.
 
+## What will you learn from this course?
+
+### Conceptual learning objectives
+
+At the end of this course, you will understand ...
+
+- The very basics of Bayesian inference
+- What a prior, likelihood, and posterior are in the context of a Bayesian model
+- The very basics of how Markov Chain Monte Carlo works
+- What a credible interval is
+
+### Practical skills
+
+At the end of this course, you will be able to ...
+
+- Write the code to specify and sample a multilevel model with random intercepts, random slopes, and interactions in **brms**.
+- Generate plots and statistics to make sure your model converged, and know a few ways to deal with convergence problems.
+- Interpret the default output of a multilevel model in **brms**.
+- Use the posterior distributions of parameters from a **brms** model to generate predictions and make contrasts.
+- Make tables of point estimates and credible intervals of parameters and predicted values from the model.
+- Make plots of model parameters and predictions, with credible intervals to show uncertainty.
+
 ## What is Bayesian inference?
 
-In its simplest form, Bayesian inference is a 
+In its simplest form, Bayesian inference is xxxx
 
 Laplace and Reverend Bayes independently invented it
 
 ## Bayes' Theorem
+
+xxxx
 
 ## Example
 
@@ -51,11 +75,13 @@ In a classical, "frequentist" analysis, there is no formal way to incorporate pr
 
 ## Why is it so computationally intensive?
 
-The main reason that Bayesian statistics was not widely adopted initially is probably a practical reason. It boils down to `p(data|model)`, the likelihood. This is a 
+The main reason that Bayesian statistics was not widely adopted initially is probably a practical reason. It boils down to `p(data|model)`, the likelihood. This is a xxxx.
 
 ## What is Stan?
 
 Andrew Gelman and colleagues developed
+
+Older methods for Monte Carlo sampling were not nearly as efficient as Hamiltonian Monte Carlo. 
 
 ## What is brms?
 
@@ -94,10 +120,10 @@ Set **brms** options. The option `brms.backend = 'cmdstanr'` means we want to us
 options(brms.backend = 'cmdstanr', mc.cores = 4)
 ```
 
-Read the data.
+Read the data. It is hosted on the GitHub repository for this course.
 
 ```{r}
-popular2data <- readRDS(gzcon(url('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.rds')))
+popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
 ```
 
 
