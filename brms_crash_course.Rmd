@@ -16,9 +16,42 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 What is this course? It is a crash course in **brms**: a brief and practical introduction to fitting Bayesian multilevel models in R and Stan using the [**brms**](https://paul-buerkner.github.io/brms/) package (**B**ayesian **R**egression **M**odels using **S**tan). Because this is intended as a practical skills course, I will only give a quick and surface-level description of Bayesian analysis and how it can be used for multilevel regression models.
 
-## What is Bayesian analysis?
+## What should you know coming into this course?
 
-Laplace and Reverend Bayes independently invneted it
+This course is designed for practicing researchers who have some experience with statistical analysis and coding in R.
+
+### Minimal prerequisites
+
+- You should have at least heard of a mixed model or multilevel model.
+- You should have at least tried to do stats and/or data science in R before.
+- You should have at least a vague knowledge of what Bayesian analysis and inference are.
+
+### Advanced prerequisites
+
+- If you have experience with the R package **lme4**, that's great because the syntax of the R package **brms** is modeled after **lme4**.
+- If you have experience with the R **tidyverse** packages, including **ggplot2**, for manipulating and plotting data, that's also great because we will be using them in this course.
+
+If you don't know what those packages are, don't sweat it because you can just follow along by copying the code.
+
+## What is Bayesian inference?
+
+In its simplest form, Bayesian inference is a 
+
+Laplace and Reverend Bayes independently invented it
+
+## Bayes' Theorem
+
+## Example
+
+Let's say we pick up a coin off the street. We have a very strong prior belief that the true probability of flipping heads on any given flip is 0.5. Let's say we flipped the coin 10 times and got 8 heads. We probably wouldn't change that belief very much based on that evidence. It simply isn't enough evidence to sway us off that belief. 
+
+But let's say a shady character on the street corner approaches us, shows us a coin, and offers to flip the coin 10 times. He offers to pay us \$1 for every tails if we pay him \$1 for every heads. Most likely, before we even got any new evidence, we'd be likely to think that the true probability of heads is not exactly 0.5. Or at least we would have a more skeptical prior belief, and we would be willing to entertain a more 
+
+In a classical, "frequentist" analysis, there is no formal way to incorporate prior information into a statistical model. In both cases, we have no choice but to say the point estimate of the true probability of heads is 0.8. 
+
+## Why is it so computationally intensive?
+
+The main reason that Bayesian statistics was not widely adopted initially is probably a practical reason. It boils down to `p(data|model)`, the likelihood. This is a 
 
 ## What is Stan?
 
@@ -33,22 +66,44 @@ Paul Buerkner developed
 - Philosophical reasons
 - Math reasons
 
-# Installing brms
+# Setup
+
+You should have already installed the R packages **brms** and **cmdstanr**, and used **cmdstanr** to install CmdStan on your personal computer. We will also be using the **tidyverse**, **emmeans**, and **tidybayes** packages today.
 
 ```{r load packages}
-
+library(brms)
+library(tidyverse)
+library(emmeans)
+library(tidybayes)
+library(easystats)
 ```
 
-```{r ggplot theme, include = FALSE}
-windowsFonts(`fgbook` = windowsFont("Franklin Gothic Book"))
+Set a plotting theme.
+
+```{r ggplot theme}
 theme_set(
-  theme_bw(base_family = 'fgbook') + 
+  theme_bw() + 
     theme(panel.grid = element_blank(),
           strip.background = element_blank())
 )
 ```
 
+Set **brms** options. The option `brms.backend = 'cmdstanr'` means we want to use CmdStanR as a backend to run the **brms** models, instead of the default backend. If you were unable to install CmdStan correctly, omit the `brms.backend = 'cmdstanr'` part. The option `mc.cores = 4` means we will use four processor cores in parallel to fit the models, meaning we can allow four Markov chains to sample simultaneously.
+
+```{r}
+options(brms.backend = 'cmdstanr', mc.cores = 4)
+```
+
+Read the data.
+
+```{r}
+popular2data <- readRDS(gzcon(url('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.rds')))
+```
+
+
 # Resources
+
+As I've already mentioned, this is not intended to be a replacement for a full Bayesian course. Richard McElreath has written an amazing Bayesian course called [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). It has a print book and ebook version, as well as a set of free video lectures. Solomon Kurz translated all the code examples in the book to **brms**, **ggplot2**, and **tidyverse** code: [Statistical Rethinking Recoded](https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/). Both are highly recommended.
 
 Here are some links to tutorials and lessons for learning basic Bayesian statistics with **brms**.
 
