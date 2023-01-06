@@ -134,35 +134,42 @@ There are quite a few columns but we only need to be concerned with a few:
 
 - `pupil`: a numeric ID for each individual (1-26). Note that the IDs are "recycled" within each class. For example pupil 1 in class 1 is not the same person as pupil 1 in class 2.
 - `class`: a numeric ID for each class (1-100). 
-- `extrov`: a numerical score for extroversion, or how outgoing each individual is (1-10).
+- `extrav`: a numerical score for extraversion, or how outgoing each individual is (1-10).
 - `sex`: a binary variable (0 = boy, 1 = girl).
 - `texp`: a numerical score for teacher experience level (2-25). This value is the same for all pupils in the same class (they share a teacher)
 - `popular`: a continuous score (0-10) of the popularity of each individual student. This is the outcome variable we are interested in explaining. 
 
-In studies of this kind, the popularity score is obtained by having each student in the class rate all other students on their popularity, then averaging the score each student received. Therefore we might expect there to be a strong effect of class on the mean popularity rating, as well as the relationship between extroversion and popularity. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
+In studies of this kind, the popularity score is obtained by having each student in the class rate all other students on their popularity, then averaging the score each student received. Therefore we might expect there to be a strong effect of class on the mean popularity rating, as well as the relationship between extraversion and popularity. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
 
-Here we say that pupil is *nested* within class because an individual pupil only occurs in one class. We say that extroversion and sex are *first-level* predictors because they are different for every pupil. We say that teacher experience is a *second-level* predictor because it is the same for all pupils in the same second-level group (class).
+Here we say that pupil is *nested* within class because an individual pupil only occurs in one class. We say that extraversion and sex are *first-level* predictors because they are different for every pupil. We say that teacher experience is a *second-level* predictor because it is the same for all pupils in the same second-level group (class).
+
+For clarity, let's convert `sex` to a factor with labels.
+
+```{r}
+popular2data <- mutate(popular2data, sex = factor(sex, labels = c('boy', 'girl')))
+```
+
 
 # Exploratory plots
 
-Let's take a look at the relationship between extroversion and popularity. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because extroversion only has integer values.
+Let's take a look at the relationship between extraversion and popularity. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because extraversion only has integer values.
 
 ```{r}
-(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrov, y = popular)) +
+(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrav, y = popular)) +
   geom_point(size = 1.2,
              alpha = .8,
              position = position_jitter(width = .2, height = 0)) +
-  ggtitle('Popularity vs. Extroversion'))
+  ggtitle('Popularity vs. extraversion'))
 ```
 
-Right now, this completely ignores the multilevel structure of the dataset. The popularity scores of pupils from the same class are not independent of one another. So far, ignoring that wrinkle, we can use the eyeball test to see that there is a moderately strong positive relationship between popularity and extroversion.
+Right now, this completely ignores the multilevel structure of the dataset. The popularity scores of pupils from the same class are not independent of one another. So far, ignoring that wrinkle, we can use the eyeball test to see that there is a moderately strong positive relationship between popularity and extraversion.
 
 We can add a regression trendline to the plot. This is a simple least squares linear regression line that ignores the nestedness of pupils within classes. Plotting simplified models in this way is fine to guide the eye for exploratory purposes.
 
 ```{r}
 pop_vs_ext +
   geom_smooth(method = lm, se = FALSE) +
-  ggtitle('Popularity vs. Extroversion', subtitle = 'overall trendline')
+  ggtitle('Popularity vs. extraversion', subtitle = 'overall trendline')
 ```
 
 This further supports our intuition that more outgoing students tend to be more popular.
@@ -170,13 +177,13 @@ This further supports our intuition that more outgoing students tend to be more 
 Now let's start to take the nested structure of the data into account. Color the points in the scatterplot based on which class (from 1 to 100) each pupil is in.
 
 ```{r}
-(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrov, y = popular, color = class, group = class)) +
+(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrav, y = popular, color = class, group = class)) +
    geom_point(size = 1.2,
               alpha = .8,
               position = position_jitter(width = .2, height = 0)) +
    theme(legend.position = 'none') +
    scale_color_distiller(palette = 'Set1') +
-   ggtitle('Popularity vs. Extroversion', 'points colored by class'))
+   ggtitle('Popularity vs. extraversion', 'points colored by class'))
 ```
 
 It's hard to visually separate the classes, because there are 100 of them and they largely overlap. Let's add different regression lines for each class. This is equivalent to fitting a separate linear model to each class. 
@@ -184,24 +191,24 @@ It's hard to visually separate the classes, because there are 100 of them and th
 ```{r}
 pop_vs_ext_colored + 
   geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
-  ggtitle('Popularity vs. Extroversion', 'trendline by class')
+  ggtitle('Popularity vs. extraversion', 'trendline by class')
 ```
 
-You can see that the relationship between popularity and extroversion varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between classes.
+You can see that the relationship between popularity and extraversion varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between classes.
 
 Here is a final exploratory plot that highlights the classes with the most extreme trends. The trendlines classes with the three highest slopes are plotted in blue, and the three lowest slopes in red. (This requires writing some code to pre-calculate the slopes and then modifying the plotting code to change the colors of the lines with the most extreme slopes).
 
 ```{r}
 popular2data %>%
   group_by(class) %>%
-  mutate(slope = lm(popular ~ extrov)$coefficients[2]) %>%
+  mutate(slope = lm(popular ~ extrav)$coefficients[2]) %>%
   ungroup %>%
   mutate(high_or_low = case_when(
     slope >= sort(unique(slope))[98] ~ 'high',
     slope <= sort(unique(slope))[3] ~ 'low',
     TRUE ~ 'mid'
   )) %>%
-  ggplot(aes(x = extrov, y = popular, group = class)) +
+  ggplot(aes(x = extrav, y = popular, group = class)) +
   geom_point(size = 1.2,
               alpha = .8,
               position = position_jitter(width = .2, height = 0)) +
@@ -210,7 +217,7 @@ popular2data %>%
   theme(legend.position = 'none') +
   scale_color_manual(values = c(high = 'blue', low = 'red', mid = 'gray50')) +
   scale_size_manual(values = c(high = 1.2, low = 1.2, mid = 0.6)) +
-  ggtitle('Popularity vs. Extroversion', 'highlighting 6 classes with most extreme relationship')
+  ggtitle('Popularity vs. extraversion', 'highlighting 6 classes with most extreme relationship')
 ```
 
 # Fitting models
@@ -332,7 +339,7 @@ This shows that the variance ratio is much greater than zero meaning there's a s
 
 # Mixed-effects model with random slopes
 
-- first do 1+sex+extrov|class
+- first do 1+sex+extrav|class
 - show that it's a very small value for the variance of sex slopes (could even show all of them)
 - this means that the individual classes' sex effects don't vary much from the overall fixed sex effect
 - we can refit the model without this random slope
@@ -340,7 +347,9 @@ This shows that the variance ratio is much greater than zero meaning there's a s
 
 # Mixed-effects model with random slopes and cross-level interaction
 
-- 
+- just add extrav:texp. This is the same way you'd do interaction within levels.
+
+# Estimated marginal means
 
 # Resources
 
