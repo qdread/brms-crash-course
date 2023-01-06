@@ -327,10 +327,68 @@ This shows that the variance ratio is much greater than zero meaning there's a s
 
 # Mixed-effects model with first level predictors 
 
-- fit the model
-- check convergence
-- discuss beta priors
-- show credible intervals of posterior parameter estimates
+The intercept-only model is a good start. But so far all we've done is pull out the random variation in mean popularity by class. We want to make inference about what factors influence popularity of individual students. To do this, we can add some fixed effect predictors (slopes) to the model.
+
+We'll start with the first-level predictors that vary by student. We will add a fixed effect for sex and for extraversion. Because these slopes are fixed and not random, that means we are assuming that the effects of sex and extraversion on popularity are the same in each class. Also, note we still haven't specified our own priors, so **brms** is defaulting to very wide and uninformative priors.
+
+```{r}
+fit_fixedslopes <- brm(popular ~ 1 + sex + extrav + (1|class),  
+                       data = popular2data, 
+                       chains = 4, iter = 2000, warmup = 1000,
+                       seed = 1400, file = 'fit_fixedslopes')
+```
+
+Notice the `seed` and `file` arguments. 
+
+- The `seed` argument (you can use any integer you want) sets the random seed so that we can reproduce the exact behavior of the MCMC chains again in case we need to refit the model. This is very important for reproducibility!
+- The `file` argument means a file called `fit_fixedslopes.rds` is created in your current working directory. This means that you can reload the fitted model object in a future R session without having to compile and sample the model again. If you run the same `brm` code again, it will look for the file and load it instead of refitting the model. This can save a lot of time if you have a model that takes hours or days to sample!
+
+Look at the density plots and trace plots of the posterior distributions of the parameters.
+
+```{r}
+plot(fit_fixedslopes)
+```
+
+Looks like they all converged. `summary()` shows low R-hat statistics and also shows that most of the mass of the posterior distribution for the slopes is well above zero. This indicates a strong positive effect of sex (because boy = 0 and girl = 1 this means girls are more popular than boys on average) and a strong positive effect of extraversion (more outgoing students are more popular). We have roughly the same random effect variance parameter as before, but now `sigma` (the standard deviation of the residuals for individual pupils) is a lot lower than before. This makes sense because we have some effects in the model that explain some of the variance and result in lower residuals.
+
+```{r}
+summary(fit_fixedslopes)
+```
+
+Here let's also inspect what default priors **brms** chose for us, and show how to modify them to see if there was any effect on the results. `prior_summary()` shows us the priors used in fitting a model.
+
+```{r}
+prior_summary(fit_fixedslopes)
+```
+
+This shows us that t-distributions were used for the priors on the intercept, the random effect SD, and the residual SD `sigma`. The mean of the t-distribution used as the prior on the intercept is 5.1 (this was gotten by just calculating the mean of the popularity values) which makes sense. The mean of the variance parameters is 0 but the lower bound `lb` is also 0. This means we have something like "half bell curves" for the variance parameters. The standard deviation of all the t-distribution priors is 2.5. These are sensible defaults and rarely need to be modified.
+
+What about the priors on the fixed effect slopes? They are flat priors. This means we are assigning exactly the same prior probability to any possible value the slope could take. Yes, that's an uninformative prior, but in practice it doesn't make sense to do this. Take the prior on sex for example. We are saying we assume that the prior probability that girls and boys have 0 difference in popularity is equal to the prior probability that girls have 10000 more units of popularity than boys, or -12345 units less, and so on. This makes no sense (especially because popularity can only range between 0 and 10)! Luckily, we have a simple model and lots of data so the model converges on a reasonable solution even with this flat prior. But if you have a more complex model, it is often a bad idea to let **brms** use these weak flat default priors. So even if you philosophically don't want to put your thumb on the scale, it's a good idea for practical reasons to specify at least a weak prior.
+
+Let's refit the model with reasonable priors on the fixed effect slopes. A normal distribution with mean 0 and a modest standard deviation, say 5, is a good choice. I like to think of it as a "null hypothesis" because it has equally as much prior probability for positive coefficients as negative. Also it allows for the possibility of extremely large effect sizes: in this context a slope of +5 or -5 would mean a change of one unit in the predictor being associated with a change of 5 units in the response. So we are being very agnostic and not assuming anything much about the effect. But it usually is beneficial for model convergence because there is very little chance the sampler will waste time trying out ridiculous values like 10000. We use the `prior` argument to `brm` and specify a vector of objects created with the `prior()` function. `class = b` means apply the same prior to all fixed effect slope parameters.
+
+```{r}
+fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1|class),  
+                       data = popular2data, 
+                       prior = c(
+                         prior(normal(0, 5), class = b)
+                       ),
+                       chains = 4, iter = 2000, warmup = 1000,
+                       seed = 1450, file = 'fit_fixedslopes_priors')
+```
+
+```{r}
+summary(fit_fixedslopes_priors)
+```
+
+In this case as we discussed, the prior has little to no influence on the result because of the large amount of data. But it's a good idea to be mindful of what you are doing and not blindly use default priors all the time.
+
+Now let's look a bit closer at the posterior distributions of the fixed effect slope parameters. `summary()` only gives us a point estimate and the upper and lower bounds of the 95% quantile-based credible interval. That's a good start but we might want to explore the posterior distribution in more detail. After all, Bayesian inference gives us a fully characterized uncertainty distribution. We have 4000 posterior samples for each parameter. Let's use some functions from the **tidybayes** package to make tables and plots of the slope parameters.
+
+```{r}
+gather_draws(fit_fixedslopes_priors, b[])
+```
+
 
 # Mixed-effects model with first and second level predictors
 
@@ -359,6 +417,10 @@ Here are some links to tutorials and lessons for learning basic Bayesian statist
 
 - [Building a multilevel model in brms](https://www.rensvandeschoot.com/tutorials/brms-started/) by Rens van de Schoot
 - [An introduction to Bayesian multilevel models using brms](https://www.barelysignificant.com/phd_thesis/appendix-brms.html) by Ladislas Nalborczyk
+
+Here is a tutorial that goes through all the cool plots and tables you can make from a **brms** model with Matthew Kay's **tidybayes** package.
+
+- [Extracting and visualizing tidy draws from brms models](https://cran.r-project.org/web/packages/tidybayes/vignettes/tidy-brms.html)
 
 Paul Buerkner published two papers on **brms**:
 
