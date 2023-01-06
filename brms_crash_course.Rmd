@@ -136,10 +136,12 @@ There are quite a few columns but we only need to be concerned with a few:
 - `class`: a numeric ID for each class (1-100). 
 - `extrov`: a numerical score for extroversion, or how outgoing each individual is (1-10).
 - `sex`: a binary variable (0 = boy, 1 = girl).
-- `texp`: a numerical score for teacher experience level (2-25).
+- `texp`: a numerical score for teacher experience level (2-25). This value is the same for all pupils in the same class (they share a teacher)
 - `popular`: a continuous score (0-10) of the popularity of each individual student. This is the outcome variable we are interested in explaining. 
 
 In studies of this kind, the popularity score is obtained by having each student in the class rate all other students on their popularity, then averaging the score each student received. Therefore we might expect there to be a strong effect of class on the mean popularity rating, as well as the relationship between extroversion and popularity. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
+
+Here we say that pupil is *nested* within class because an individual pupil only occurs in one class. We say that extroversion and sex are *first-level* predictors because they are different for every pupil. We say that teacher experience is a *second-level* predictor because it is the same for all pupils in the same second-level group (class).
 
 # Exploratory plots
 
@@ -221,7 +223,14 @@ If you have ever fit a mixed model using the R package `lme4`, this will look fa
 lmer(popular ~ 1 + (1 | class), data = popular2data)
 ```
 
-That is the syntax for fitting a mixed-effects model with the only fixed effect being the intercept (`1`) and a random intercept fit to each class. In the `lme4` package, the random effects specification has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`. In this case, `(1 | class)`, the `1` on the design side means only fit random intercepts and no random slopes, and the `class` on the group side means the groups that each get their own intercept are defined by the `class` variable.
+That is the syntax for fitting a mixed-effects model:
+
+- The dependent or response variable (`popular`) is on the left side of the formula.
+- A tilde `~` separates the dependent from the independent variables. 
+- Here the only fixed effect is the global intercept (`1`) and there is a random intercept fit to each class. 
+- The random effects specification (`(1 | class)`) has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`. 
+- In this case, the `1` on the design side means only fit random intercepts and no random slopes.
+- The `class` on the group side means each class will get its own random intercept.
 
 The beauty of **brms** is that it allows you to fit a Bayesian multilevel model with very similar syntax to the frequentist **lme4**. Instead of getting maximum likelihood point estimates of the model parameters (the fixed and random effects), we're going to get posterior distributions for all of them! Get hyped!!! 
 
@@ -238,10 +247,100 @@ You may notice I have made no mention of priors yet. Another great thing about *
 
 Without further ado, here is our first Bayesian multilevel model!
 
-```{r}
+Notice we have specified the model formula, the data, and the number of chains (2). Each chain will run for 200 total iterations, of which the first 100 are warmup when the sampler will be determining the optimal "jump" size to make at each iteration. We will get 200 - 100 = 100 draws from the posterior distribution for each chain. Finally, we let the initial values for the parameters all be random between -2 and 2 (default).
 
+```{r}
+fit_interceptonly <- brm(popular ~ 1 + (1 | class),
+                         data = popular2data,
+                         chains = 2,
+                         iter = 200,
+                         warmup = 100,
+                         init = 'random')
 ```
 
+The model takes a minute or two to compile the C++ code but only two or three seconds to sample.
+
+Use the `summary()` function to see the output.
+
+```{r}
+summary(fit_interceptonly)
+```
+
+We get a warning about convergence. This is because I purposefully set the chains to run for a very small number of warmup and post-warmup sampling iterations. 
+
+The `Rhat` values for some of the parameters are > 1.05. What does this mean? `Rhat` is a statistic used to roughly indicate when multiple MCMC chains have converged on the same distribution. As chains approach convergence, the R-hat statistic approaches 1. It is ideal for all R-hat values for a model to be < 1.01, but at a bare minimum we need to have all R-hat values < 1.05.
+
+We can also `plot()` the model object to get density plots and trace plots of the posterior distribution (the 100 post warmup samples for each Markov chain)
+
+```{r}
+plot(fit_interceptonly)
+```
+
+What does this show? We see diagnostics for the three most important parameters of the model: 
+
+- the fixed effect intercept (`b_Intercept`). All fixed effect parameters in `brm` models begin with `b`, short for `beta`.
+- the standard deviation of the random class intercepts (`sd_class__Intercept`)
+- the standard deviation of the model's residuals (`sigma`)
+
+On the left are density plots for the posterior distributions of the parameters (made from the 200 posterior samples, 100 from each of the 2 chains).
+
+On the right are trace plots for the 100 post-warmup posterior samples for each of the chains separately. The HMC algorithm is so good that even with purely default priors and only a very small number of samples, we actually get pretty close to convergence. That would never be possible with older algorithms, which would have required thousands of samples. But they aren't quite converged. We still see that there are some trends in the trace plots where sometimes a chain is exploring one part of parameter space and sometimes another. This is a sign of failure to converge. The more complicated your models get, the more you will see this. 
+
+What do we do about this? We can take the advice of the warning and either increase the number of iterations or set different priors. For now, let's increase the number of iterations to 1000 warmup and 1000 sampling (2000 total). We will get a total of 2000 posterior samples.
+
+We can use the `update()` method to draw more samples from the posterior distribution without having to recompile the model code.
+
+```{r}
+fit_interceptonly_moresamples <- update(fit_interceptonly, chains = 2, iter = 2000, warmup = 1000)
+```
+
+Now let's look at the convergence diagnostic plots.
+
+```{r}
+plot(fit_interceptonly_moresamples)
+```
+
+The posterior distributions' density plots look like very smooth curves instead of the lumpy ones we saw in the previous plot (this is good) and the trace plots look like "hairy caterpillars" -- successive samples just move back and forth around a central tendency, with no trends over time. There is nearly complete overlap between chain 1 and chain 2 -- the chains are "mixing" well and so we can say from eyeballing it that we have converged on the solution.
+
+Let's call `summary()` again to look at the convergence diagnostic `Rhat` as well as some information about the parameters.
+
+```{r}
+summary(fit_interceptonly_moresamples)
+```
+
+We see low numbers for `Rhat`. Looking at the parameter values, we can see the fixed-effect or "population-level" intercept is about 5, with a 95% credible interval ranging from 4.9 to 5.25. We can also see the standard deviation for the "group-level" or random class intercepts `sd(Intercept)` and for the pupils within classes (the standard deviation of the overall model residuals `sigma`).
+
+We can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the **performance** package (part of **easystats**), which also gives us a credible interval. We'll use 99%.
+
+```{r}
+variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
+```
+
+This shows that the variance ratio is much greater than zero meaning there's a strong need for a multilevel model in this case. Actually, if you have a dataset with a grouped structure, I would recommend still using a multilevel model even if the variance decomposition does not necessarily say it's warranted. It's better to stick with the model that your study design calls for.
+
+# Mixed-effects model with first level predictors 
+
+- fit the model
+- check convergence
+- discuss beta priors
+- show credible intervals of posterior parameter estimates
+
+# Mixed-effects model with first and second level predictors
+
+- texp is a predictor variable that is the same for all pupils in a class
+- we don't need to specify it any differently in the model though
+
+# Mixed-effects model with random slopes
+
+- first do 1+sex+extrov|class
+- show that it's a very small value for the variance of sex slopes (could even show all of them)
+- this means that the individual classes' sex effects don't vary much from the overall fixed sex effect
+- we can refit the model without this random slope
+- wouldn't make sense to have a random slope for texp because texp is the same for all pupils in a class
+
+# Mixed-effects model with random slopes and cross-level interaction
+
+- 
 
 # Resources
 
