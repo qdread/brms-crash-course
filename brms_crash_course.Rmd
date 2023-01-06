@@ -385,12 +385,46 @@ In this case as we discussed, the prior has little to no influence on the result
 
 Now let's look a bit closer at the posterior distributions of the fixed effect slope parameters. `summary()` only gives us a point estimate and the upper and lower bounds of the 95% quantile-based credible interval. That's a good start but we might want to explore the posterior distribution in more detail. After all, Bayesian inference gives us a fully characterized uncertainty distribution. We have 4000 posterior samples for each parameter. Let's use some functions from the **tidybayes** package to make tables and plots of the slope parameters.
 
+First we use `gather_draws()` to pull out the posterior samples for some variables of our choosing and make a "tidy" data frame out of them.
+
 ```{r}
-gather_draws(fit_fixedslopes_priors, b[])
+posterior_slopes <- gather_draws(fit_fixedslopes_priors, b_sex, b_extrav)
+
+posterior_slopes
 ```
 
+The result is 8000 rows (4000 posterior samples for each of two slope parameters) and has columns indicating which chain and which iteration each sample comes from. Because the chains are all converged and mixed, we can ignore which chain each sample comes from and pool them all together.
+
+We can calculate summary statistics (quantiles) for each of the parameters with `median_qi()`. By default it gives 95% intervals but we can specify any width(s).
+
+```{r}
+posterior_slopes %>%
+  median_qi(.width = c(.66, .95, .99))
+```
+
+We can also use some special **ggplot2** extensions to make different kinds of plots that illustrate the shape of the posterior and the credible intervals. Here are two ways of doing it. On both plots I've included a dashed line at zero to highlight that all the probability mass is much greater than zero for both effects.
+
+```{r}
+ggplot(posterior_slopes, aes(y = .variable, x = .value)) +
+  stat_halfeye(.width = c(.8, .95)) +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = 1)
+```
+
+```{r}
+ggplot(posterior_slopes, aes(y = .variable, x = .value)) +
+  stat_interval() +
+  stat_summary(fun = median, geom = 'point', size = 2) +
+  scale_color_brewer(palette = 'Blues') +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = 1)
+```
+
+Because these posteriors are so symmetrical and resemble normal distributions, the credible intervals are a good way of describing the distribution and it isn't really necessary to show the density plots. But for many skewed posteriors, it is often helpful to illustrate the shape of the distribution.
+
+We will show more examples of how to summarize and visualize predictions later on.
 
 # Mixed-effects model with first and second level predictors
+
+Sex and extraversion are first-level predictors: they vary by individual student, even those that share the same class. A second-level predictor is one that is shared by all pupils in a class. In this dataset, the `texp` (teacher experience) variable is a second-level predictor because all pupils in the same "homeroom" class have the same teacher.
 
 - texp is a predictor variable that is the same for all pupils in a class
 - we don't need to specify it any differently in the model though
@@ -409,6 +443,8 @@ gather_draws(fit_fixedslopes_priors, b[])
 
 # Estimated marginal means
 
+# Bayes Factors
+
 # Resources
 
 As I've already mentioned, this is not intended to be a replacement for a full Bayesian course. Richard McElreath has written an amazing Bayesian course called [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). It has a print book and ebook version, as well as a set of free video lectures. Solomon Kurz translated all the code examples in the book to **brms**, **ggplot2**, and **tidyverse** code: [Statistical Rethinking Recoded](https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/). Both are highly recommended.
@@ -418,7 +454,7 @@ Here are some links to tutorials and lessons for learning basic Bayesian statist
 - [Building a multilevel model in brms](https://www.rensvandeschoot.com/tutorials/brms-started/) by Rens van de Schoot
 - [An introduction to Bayesian multilevel models using brms](https://www.barelysignificant.com/phd_thesis/appendix-brms.html) by Ladislas Nalborczyk
 
-Here is a tutorial that goes through all the cool plots and tables you can make from a **brms** model with Matthew Kay's **tidybayes** package.
+Here is a tutorial that goes through all the cool plots and tables you can make from a **brms** model with Matthew Kay's **tidybayes** package. I've shown a few of them in this lesson but there are many other visualizations available.
 
 - [Extracting and visualizing tidy draws from brms models](https://cran.r-project.org/web/packages/tidybayes/vignettes/tidy-brms.html)
 
