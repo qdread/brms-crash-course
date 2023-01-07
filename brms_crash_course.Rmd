@@ -1,5 +1,5 @@
 ---
-title: "title"
+title: "A crash course in Bayesian mixed models with brms"
 author: "Quentin D. Read"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: 
@@ -11,6 +11,14 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
+
+<!--
+TO DO:
+
+- add more convincing explanation of why bayes is good, including description of how you can get a distribution for any quantity you want
+- write some exercises
+- clean up headings
+-->
 
 # Introduction
 
@@ -114,34 +122,37 @@ In a classical, "frequentist" analysis, there is no formal way to incorporate pr
 
 The coin flip example was pretty easy &mdash; you can do it in your head! Why do we need such advanced computational tools to do Bayesian inference?
 
-The main reason that Bayesian statistics were not widely adopted initially is probably a practical reason. It boils down to $$P(data|model)$$, the likelihood. If our "model" is just a single parameter like the probability of a coin flip being heads, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $$P(data|model)$$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
+The main reason that Bayesian statistics were not widely adopted initially is probably a practical one. It boils down to $$P(data|model)$$, the likelihood, which we need to calculate to estimate $$P(model|data)$$, the posterior. If our "model" is just a single parameter like the probability of a coin flip being heads, and our "data" is just a count of heads out of 10, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $$P(model|data)$$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
 
 If you remember even trying to do two-dimensional integration on paper from calculus class, imagine doing 100-dimensional integration or even more! There just isn't enough time in the universe to get a precise solution for an integral with that many dimensions. In the time of Thomas Bayes, and for hundreds of years after that, Bayesian statistics simply couldn't be applied to real-world problems because of this computational limitation.
 
 ### Markov Chain Monte Carlo
 
-That's where Markov Chain Monte Carlo (MCMC), aided by super-fast modern microprocessors, comes in. What is MCMC?
+That's where Markov Chain Monte Carlo (MCMC), aided by super-fast modern microprocessors, comes in. What is MCMC? It's a class of algorithms for drawing samples from a probability distribution. The longer the algorithm runs, the closer it gets to the true distribution. I won't describe it in detail here but the best beginner-level description of MCMC I've ever read is in Richard McElreath's book [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). 
 
-XXXXXXX
+Because fitting complicated Bayesian models requires you to characterize a very high-dimensional probability distribution (the posterior), most Bayesian inference uses MCMC (although there is an alternative way to [approximate Bayesian inference](https://en.wikipedia.org/wiki/Integrated_nested_Laplace_approximations)). Usually in practice you run multiple Markov chains for a prespecified number of samples, discard some samples from the beginning of the chains when they were still searching for the correct solution, and retaining only the samples that you think characterize the true posterior distribution.
 
 ## What is Stan?
 
-Andrew Gelman and colleagues developed
+MCMC is a class of algorithms &mdash; there's more than one way to do it. In 1987, some physicists proposed a new MCMC algorithm called Hamiltonian Monte Carlo (HMC) to do calculations in quantum physics. I won't describe HMC here, except to say that it really works! Older MCMC algorithms are not nearly as efficient as HMC. HMC can converge on a solution ten times faster, if not more, than other algorithms. It makes Bayesian inference so much more practical. Recently, [Andrew Gelman](andrewgelman.com) and colleagues developed [Stan](mc-stan.org), which is a software platform for Bayesian statistical modeling using HMC. The models we will fit with **brms** in this lesson use Stan for back-end computation.
 
-Older methods for Monte Carlo sampling were not nearly as efficient as Hamiltonian Monte Carlo. 
-
-HMC is now the state of the art for estimating high-dimensional integrals for Bayesian inference. It is also implemented in SAS [PROC BGLIMM](https://documentation.sas.com/doc/en/statug/15.2/statug_bglimm_details12.htm) and [MATLAB](https://www.mathworks.com/help/stats/hamiltoniansampler-class.html), among other stats packages, because it is just so damn good.
+Because HMC is now the state of the art for estimating high-dimensional integrals for Bayesian inference, it is not only implemented in Stan. It is also implemented in SAS [PROC BGLIMM](https://documentation.sas.com/doc/en/statug/15.2/statug_bglimm_details12.htm) and [MATLAB](https://www.mathworks.com/help/stats/hamiltoniansampler-class.html), among other stats packages, because it is just so damn good.
 
 ## What is brms?
 
-Paul Buerkner developed
+One hurdle for getting more people to use Stan is that you have to write quite a lot of code to specify a model in Stan. There are a lot of "tricks" that Stan users have developed to optimize their models and make them run faster. It can be hard to figure out how to implement all those tricks in the context of your statistical model. Luckily, a statistician named Paul B&uuml;rkner developed an R package called [**brms**](https://paul-buerkner.github.io/brms/). **brms** lets you set up regression models in R with very simple syntax. Behind the scenes, it translates your R code into Stan code, complete with all the tricks of scaling parameters, putting sensible prior distributions on parameters, and then runs the Stan model for you. 
 
-## Why use it?
+Out of the thousands of R packages out there, **brms** is far and away my favorite. Paul is extremely dedicated to his work. He has been very responsive to any issues I've raised and has added new features to **brms** at my request. Danke, Paul!
 
-You might be asking yourself, if it's so hard to do Bayesian inference, why bother? Maximum likelihood frequentist methods work really well! 
+We are going to use **brms** to fit Bayesian linear mixed models today.
 
-- Philosophical reasons
-- Math reasons
+## Why use Bayes?
+
+After all that, you might be asking yourself, if it's so hard to do Bayesian inference, why bother? Maximum likelihood frequentist methods work really well! Well, they do, up to a point. There are some kinds of multilevel model that frequentist methods have a lot of trouble estimating the parameters for. Sometimes the maximum likelihood algorithms fail to find a solution. So even if you aren't completely convinced by the philosophical reasons to use Bayesian inference, it can be very practical from a computational standpoint. You can estimate models with Bayesian methods that simply can't be estimated any other way.
+
+Philosophically, there is another big advantage to Bayesian inference. Classical statistical methods are all based around rejecting a null hypothesis. This is very reductionist because it reduces real-world questions about how strong an effect is to a black-and-white yes-or-no answer. In Bayesian inference, we use the posterior distribution to say what we believe the size of the effect is. Bayesian inference lets us directly say "the probability that the effect is between X and Y is 95%" while in a frequentist analysis you have to say "if we ran the experiment again many times, our estimate of the parameter would be between X and Y 95% of the time." 
+
+I think I have gone on long enough talking about why to use Bayesian inference. Let's try to do some Bayesian modeling ourselves with **brms** to show how this powerful method works in practice!
 
 # Setup
 
@@ -275,7 +286,7 @@ popular2data %>%
 
 ## Intercept-only model
 
-If you have ever fit a mixed model using the R package `lme4`, this will look familiar to you:
+If you have ever fit a mixed model using the R package **lme4**, this will look familiar to you:
 
 ```{r, eval = FALSE}
 lmer(popular ~ 1 + (1 | class), data = popular2data)
@@ -290,7 +301,7 @@ That is the syntax for fitting a mixed-effects model:
 - In this case, the `1` on the design side means only fit random intercepts and no random slopes.
 - The `class` on the group side means each class will get its own random intercept.
 
-The beauty of **brms** is that it allows you to fit a Bayesian multilevel model with very similar syntax to the frequentist **lme4**. Instead of getting maximum likelihood point estimates of the model parameters (the fixed and random effects), we're going to get posterior distributions for all of them! Get hyped!!! 
+**brms** allows you to fit a Bayesian multilevel model with very similar syntax to the frequentist **lme4**. But instead of just getting maximum likelihood point estimates of the model parameters (the fixed and random effects), we're going to get posterior distributions for all of them! Get hyped!!! 
 
 But to do this we need to give a few extra directions to the Hamiltonian Monte Carlo sampling algorithm:
 
@@ -301,7 +312,7 @@ But to do this we need to give a few extra directions to the Hamiltonian Monte C
 
 If we don't specify any of these, **brms** will use default values for number of chains and iterations, and it will assign random values for the initial values. 
 
-You may notice I have made no mention of priors yet. Another great thing about **brms** is that if you do not specify priors, it will assign uninformative priors that are at least plausible for each of the parameters. (For example, if the parameter is a variance parameter that must be positive, it will assign a prior distribution that is truncated at zero). This can be a great time saver but it can also be a dangerous thing. We will revisit priors later. For now we will skip specifying the priors and use the defaults.
+You may notice I have made no mention of priors yet. Another great thing about **brms** is that if you do not specify priors, it will assign uninformative priors that are at least plausible for each of the parameters. (For example, if the parameter is a variance parameter that must be positive, it will assign a prior distribution that is truncated at zero). This can be a major time saver but it can also be a dangerous thing. We will revisit priors later. For now we will skip specifying the priors and use the defaults.
 
 Without further ado, here is our first Bayesian multilevel model!
 
@@ -498,7 +509,13 @@ Sex and extraversion are first-level predictors: they vary by individual student
 
 # Comparing models with information criteria
 
-# Resources
+# Conclusion
+
+What did we just learn? Let's take a look back at the learning objectives!
+
+xxxxx
+
+# Going further
 
 As I've already mentioned, this is not intended to be a replacement for a full Bayesian course. Richard McElreath has written an amazing Bayesian course called [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). It has a print book and ebook version, as well as a set of free video lectures. Solomon Kurz translated all the code examples in the book to **brms**, **ggplot2**, and **tidyverse** code: [Statistical Rethinking Recoded](https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/). Both are highly recommended.
 
@@ -516,9 +533,16 @@ Paul Buerkner published two papers on **brms**:
 - [Buerkner 2017, Journal of Statistical Software](https://www.jstatsoft.org/article/view/v080i01)
 - [Buerkner 2018, The R Journal](https://journal.r-project.org/archive/2018/RJ-2018-017/index.html)
 
-# Alternatives
+There are also other ways to fit Bayesian mixed models in R.
 
-- rstanarm
-- MCMCglmm
-- PyStan (other platforms for Stan)
-- CmdStan
+- [rstanarm](https://mc-stan.org/rstanarm/) is another R package that uses Stan behind the scenes, like **brms**.
+- [MCMCglmm](https://cran.r-project.org/web/packages/MCMCglmm/index.html) is another R package that fits Bayesian mixed models, but doesn't use Stan.
+
+You can use Stan without R as well, if that's your thing.
+
+- [PyStan](https://pystan.readthedocs.io/) is a Python interface to Stan
+- [CmdStan](https://mc-stan.org/users/interfaces/cmdstan) is a shell interface to Stan that lets you run Stan models directly from the command line (if you're a glutton for punishment).
+
+# Exercises
+
+Coming soon!
