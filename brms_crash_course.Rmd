@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 What is this course? It is a crash course in **brms**: a brief and practical introduction to fitting Bayesian multilevel models in R and Stan using the [**brms**](https://paul-buerkner.github.io/brms/) package (**B**ayesian **R**egression **M**odels using **S**tan). Because this is intended as a practical skills course, I will only give a quick and surface-level description of Bayesian analysis and how it can be used for multilevel regression models.
 
+[Download the worksheet for this lesson here](https://quentinread.com/SEAStats/brms_crash_course/brms_crash_course_worksheet.R).
+
 ## What should you know coming into this course?
 
 This course is designed for practicing researchers who have some experience with statistical analysis and coding in R.
@@ -57,25 +59,70 @@ At the end of this course, you will be able to ...
 
 ## What is Bayesian inference?
 
-In its simplest form, Bayesian inference is xxxx
+![](https://upload.wikimedia.org/wikipedia/commons/d/d4/Thomas_Bayes.gif)  
+*This may or may not actually be a portrait of Thomas Bayes*
 
-Laplace and Reverend Bayes independently invented it
+In its simplest form, Bayesian inference is a method of statistical inference that allows you to use information you already know to assign a prior probability to a hypothesis, then update the probability of that hypothesis as you get more information. If that seems like common sense, it is! 
+
+It is a very powerful tool that has been applied across many fields of human endeavor. Today we are only going to look at its application in estimating the parameters of multilevel statistical models to analyze scientific data, but that's only one of the many things we can use Bayesian inference for. Bayesian methods are only growing in popularity, thanks in large part to the rapid growth of user-friendly, open-source, computationally powerful software -- like Stan and its companion R package **brms** that we are going to learn about today!
+
+Bayesian inference is named after Reverend Thomas Bayes, an English clergyman, philosopher, and yes, statistician, who wrote a scholarly work on probability (published after his death in 1763). His essay included an algorithm to use evidence to find the distribution of the probability parameter of a binomial distribution ... using what we now call Bayes' Theorem! However, much of the foundations of Bayesian inference were really developed by Pierre-Simon Laplace independently of Bayes and at roughly the same time. Give credit where it's due!
 
 ## Bayes' Theorem
 
-xxxx
+![](https://static.scientificamerican.com/blogs/cache/file/5687448D-1F52-4287-A13D53F37A35BE41_source.jpg)
+
+Bayes' Theorem is the basis of Bayesian inference. It is a rule that describes how likely an event is to happen (its probability), based on our prior knowledge about conditions related to that event. In other words, it describes the *conditional* probability of an event *A* occurring, conditioned on the probability of another event *B* occurring.
+
+The mathematical statement of Bayes' theorem is:
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+This means the **probability of A being true given that B is true** ($$P(A|B)$$) is equal to the **probability that B is true given that A is true** ($$P(B|A)$$) times the **ratio of probabilities that A and B are true** ($$\frac{P(A)}{P(B)}$$). 
+
+This may not make sense yet but some more concrete examples might help.
+
+## How Bayes' theorem relates to statistical inference
+
+Let's say *A* is a statistical model. A statistical model is a hypothesis about the world. We want to know the probability that our hypothesis is true. We start out with some prior knowledge about the probability that our model *A* is true. So $$P(A)$$ is called the **prior probability**. We go out there and get some data *B* to test our hypothesis. We can calculate the probability of observing that data *B*, given that *A* is true: $$P(B|A)$$. This is also known as the **likelihood** of the model *A*, in light of our observations *B*. We use this to update our estimate of the probability that *A* is true. We now have $$P(A|B)$$, the probability our model, or hypothesis, is true, given the data we just observed. 
+
+Notice we ignored the denominator, $$P(B)$$. This is called the **marginal probability**. We can usually ignore it in the context of statistical inference. That's because the best we can do is to compare the relative probability of two models, given the data. We can't really say (nor should we say) what the absolute probability of a model is. If we only have one dataset, there's only one $$P(B)$$. If we are comparing two models $A_1$ and $A_2$ and we take the ratio $$\frac{P(A_1|B)}{P(A_2|B)}$$, the two $$P(B)$$s cancel out. Thus we don't really need to care about $$P(B)$$ in practice.
+
+So we can get rid of the denominator and write Bayes' theorem as
+
+$$P(model|data) \propto P(data|model)P(model)$$
+
+or
+
+$$posterior = likelihood \times prior$$
+
+or, flipping the left and right sides around,
+
+*what we believed before about the world (prior) &times; how much our new data changes our beliefs (likelihood) = what we believe now about the world (posterior)*
+
+That's pretty cool!
 
 ## Example
 
-Let's say we pick up a coin off the street. We have a very strong prior belief that the true probability of flipping heads on any given flip is 0.5. Let's say we flipped the coin 10 times and got 8 heads. We probably wouldn't change that belief very much based on that evidence. It simply isn't enough evidence to sway us off that belief. 
+Let's say we pick up a coin off the street. We have a very strong prior belief that the true probability of flipping heads on any given flip is 0.5. Let's say we flipped the coin 10 times and got 8 heads. We probably wouldn't change that belief very much based on that evidence. It simply isn't enough evidence to sway us off that belief. The likelihood of getting 8 heads, given that the true probability is 0.5, is still high enough that our posterior estimate of the probability is still around 0.5.
 
-But let's say a shady character on the street corner approaches us, shows us a coin, and offers to flip the coin 10 times. He offers to pay us \$1 for every tails if we pay him \$1 for every heads. Most likely, before we even got any new evidence, we'd be likely to think that the true probability of heads is not exactly 0.5. Or at least we would have a more skeptical prior belief, and we would be willing to entertain a more 
+But let's say a shady character on the street corner approaches us, shows us a coin, and offers to flip the coin 10 times. He offers to pay us \$1 for every tails if we pay him \$1 for every heads. Most likely, before we even got any new evidence, we'd be likely to think that the true probability of heads is not exactly 0.5. Or at least we would have a more skeptical prior belief, and we would be willing to entertain the possibility that the true probability of heads might be higher than 0.5. So now if we observe 8 heads, we might update our estimate of the true probability of heads to something higher, maybe 0.7.
 
 In a classical, "frequentist" analysis, there is no formal way to incorporate prior information into a statistical model. In both cases, we have no choice but to say the point estimate of the true probability of heads is 0.8. 
 
 ## Why is it so computationally intensive?
 
-The main reason that Bayesian statistics was not widely adopted initially is probably a practical reason. It boils down to `p(data|model)`, the likelihood. This is a xxxx.
+The coin flip example was pretty easy &mdash; you can do it in your head! Why do we need such advanced computational tools to do Bayesian inference?
+
+The main reason that Bayesian statistics were not widely adopted initially is probably a practical reason. It boils down to $$P(data|model)$$, the likelihood. If our "model" is just a single parameter like the probability of a coin flip being heads, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $$P(data|model)$$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
+
+If you remember even trying to do two-dimensional integration on paper from calculus class, imagine doing 100-dimensional integration or even more! There just isn't enough time in the universe to get a precise solution for an integral with that many dimensions. In the time of Thomas Bayes, and for hundreds of years after that, Bayesian statistics simply couldn't be applied to real-world problems because of this computational limitation.
+
+### Markov Chain Monte Carlo
+
+That's where Markov Chain Monte Carlo (MCMC), aided by super-fast modern microprocessors, comes in. What is MCMC?
+
+XXXXXXX
 
 ## What is Stan?
 
@@ -83,11 +130,15 @@ Andrew Gelman and colleagues developed
 
 Older methods for Monte Carlo sampling were not nearly as efficient as Hamiltonian Monte Carlo. 
 
+HMC is now the state of the art for estimating high-dimensional integrals for Bayesian inference. It is also implemented in SAS [PROC BGLIMM](https://documentation.sas.com/doc/en/statug/15.2/statug_bglimm_details12.htm) and [MATLAB](https://www.mathworks.com/help/stats/hamiltoniansampler-class.html), among other stats packages, because it is just so damn good.
+
 ## What is brms?
 
 Paul Buerkner developed
 
 ## Why use it?
+
+You might be asking yourself, if it's so hard to do Bayesian inference, why bother? Maximum likelihood frequentist methods work really well! 
 
 - Philosophical reasons
 - Math reasons
@@ -444,6 +495,8 @@ Sex and extraversion are first-level predictors: they vary by individual student
 # Estimated marginal means
 
 # Bayes Factors
+
+# Comparing models with information criteria
 
 # Resources
 
