@@ -18,6 +18,9 @@ TO DO:
 - add more convincing explanation of why bayes is good, including description of how you can get a distribution for any quantity you want
 - write some exercises
 - clean up headings
+- estimated marginal means will be added to a future lesson
+- credible intervals need to be explained better
+- pp_check needs to be explained better
 -->
 
 # Introduction
@@ -116,6 +119,10 @@ Let's say we pick up a coin off the street. We have a very strong prior belief t
 
 But let's say a shady character on the street corner approaches us, shows us a coin, and offers to flip the coin 10 times. He offers to pay us \$1 for every tails if we pay him \$1 for every heads. Most likely, before we even got any new evidence, we'd be likely to think that the true probability of heads is not exactly 0.5. Or at least we would have a more skeptical prior belief, and we would be willing to entertain the possibility that the true probability of heads might be higher than 0.5. So now if we observe 8 heads, we might update our estimate of the true probability of heads to something higher, maybe 0.7.
 
+![](https://i.ytimg.com/vi/A-L7KOjyDrE/maxresdefault.jpg)
+
+*Our shady character might've studied this YouTube video.*
+
 In a classical, "frequentist" analysis, there is no formal way to incorporate prior information into a statistical model. In both cases, we have no choice but to say the point estimate of the true probability of heads is 0.8. 
 
 ## Why is it so computationally intensive?
@@ -135,6 +142,10 @@ Because fitting complicated Bayesian models requires you to characterize a very 
 ## What is Stan?
 
 MCMC is a class of algorithms &mdash; there's more than one way to do it. In 1987, some physicists proposed a new MCMC algorithm called Hamiltonian Monte Carlo (HMC) to do calculations in quantum physics. I won't describe HMC here, except to say that it really works! Older MCMC algorithms are not nearly as efficient as HMC. HMC can converge on a solution ten times faster, if not more, than other algorithms. It makes Bayesian inference so much more practical. Recently, [Andrew Gelman](andrewgelman.com) and colleagues developed [Stan](mc-stan.org), which is a software platform for Bayesian statistical modeling using HMC. The models we will fit with **brms** in this lesson use Stan for back-end computation.
+
+![](https://raw.githubusercontent.com/chi-feng/mcmc-demo/master/docs/hmc.gif)
+
+*Animation of HMC in action exploring a probability distribution*
 
 Because HMC is now the state of the art for estimating high-dimensional integrals for Bayesian inference, it is not only implemented in Stan. It is also implemented in SAS [PROC BGLIMM](https://documentation.sas.com/doc/en/statug/15.2/statug_bglimm_details12.htm) and [MATLAB](https://www.mathworks.com/help/stats/hamiltoniansampler-class.html), among other stats packages, because it is just so damn good.
 
@@ -359,7 +370,9 @@ What do we do about this? We can take the advice of the warning and either incre
 
 We can use the `update()` method to draw more samples from the posterior distribution without having to recompile the model code.
 
-```{r}
+> Note: from now on I will not show the output of the **brms** progress indicator in this tutorial, but you will continue to see it in your R console as you run the code.
+
+```{r, results = 'hide'}
 fit_interceptonly_moresamples <- update(fit_interceptonly, chains = 2, iter = 2000, warmup = 1000)
 ```
 
@@ -379,7 +392,25 @@ summary(fit_interceptonly_moresamples)
 
 We see low numbers for `Rhat`. Looking at the parameter values, we can see the fixed-effect or "population-level" intercept is about 5, with a 95% credible interval ranging from 4.9 to 5.25. We can also see the standard deviation for the "group-level" or random class intercepts `sd(Intercept)` and for the pupils within classes (the standard deviation of the overall model residuals `sigma`).
 
-We can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the **performance** package (part of **easystats**), which also gives us a credible interval. We'll use 99%.
+But what is this "credible interval" thing? Doesn't CI stand for confidence interval? You might be asking yourself this. Well, the posterior distribution for each parameter is a bunch of samples. We can calculate quantiles from this distribution. For example, we are 90% confident that the true value of the overall mean of popularity across all classes is somewhere between the 5th and 95th percentile of the posterior distribution of that value. This is much more straightforward than the interpretation of a confidence interval from a frequentist model. But unfortunately someone chose "credible interval" for its name which has the same initials as "confidence interval." In this lesson we will use quantile-based credible intervals (though there are other kinds) which you sometimes see called QI for quantile interval.
+
+We can pull out all 2000 samples from the posterior distribution of the intercept and calculate or plot any credible interval we want. The function `as_draws_df()` gets all draws from the posterior distribution for each parameter in a model and puts them into columns of a data frame.
+
+For example here is the median and the 90% quantile credible interval for the intercept.
+
+```{r}
+post_samples <- as_draws_df(fit_interceptonly_moresamples)
+post_samples_intercept <- post_samples$b_Intercept
+
+median(post_samples_intercept)
+quantile(post_samples_intercept, c(0.05, 0.95))
+```
+
+A useful thing about Bayesian models is that you can get a posterior distribution, and any credible interval you want, for any component of the model: parameter estimates, predicted values, etc. This is much harder to do in a frequentist model. We will see some of that later on in the model.
+
+## Variance decomposition
+
+It is a good idea to examine the proportions of variance at different levels in your nested dataset. In this case we can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the **performance** package (part of **easystats**), which also gives us a credible interval. We'll use 99%.
 
 ```{r}
 variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
@@ -394,7 +425,7 @@ The intercept-only model is a good start. But so far all we've done is pull out 
 We'll start with the first-level predictors that vary by student. We will add a fixed effect for sex and for extraversion. Because these slopes are fixed and not random, that means we are assuming that the effects of sex and extraversion on popularity are the same in each class. Also, note we still haven't specified our own priors, so **brms** is defaulting to very wide and uninformative priors.
 
 ```{r}
-fit_fixedslopes <- brm(popular ~ 1 + sex + extrav + (1|class),  
+fit_fixedslopes <- brm(popular ~ 1 + sex + extrav + (1 | class),  
                        data = popular2data, 
                        chains = 4, iter = 2000, warmup = 1000,
                        seed = 1400, file = 'fit_fixedslopes')
@@ -430,7 +461,7 @@ What about the priors on the fixed effect slopes? They are flat priors. This mea
 Let's refit the model with reasonable priors on the fixed effect slopes. A normal distribution with mean 0 and a modest standard deviation, say 5, is a good choice. I like to think of it as a "null hypothesis" because it has equally as much prior probability for positive coefficients as negative. Also it allows for the possibility of extremely large effect sizes: in this context a slope of +5 or -5 would mean a change of one unit in the predictor being associated with a change of 5 units in the response. So we are being very agnostic and not assuming anything much about the effect. But it usually is beneficial for model convergence because there is very little chance the sampler will waste time trying out ridiculous values like 10000. We use the `prior` argument to `brm` and specify a vector of objects created with the `prior()` function. `class = b` means apply the same prior to all fixed effect slope parameters.
 
 ```{r}
-fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1|class),  
+fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1 | class),  
                        data = popular2data, 
                        prior = c(
                          prior(normal(0, 5), class = b)
@@ -444,6 +475,16 @@ summary(fit_fixedslopes_priors)
 ```
 
 In this case as we discussed, the prior has little to no influence on the result because of the large amount of data. But it's a good idea to be mindful of what you are doing and not blindly use default priors all the time.
+
+## Posterior predictive check
+
+Whenever you fit a model, another good diagnostic to look at is the *posterior predictive check*. Use `pp_check()` to automatically generate a plot.
+
+```{r}
+pp_check(fit_fixedslopes_priors)
+```
+
+This plot shows a density plot of the observed data (black line) and density plots for the fitted values of the model for (by default) 10 random samples from the posterior distribution of the parameters (thin blue lines). Because these are simulated data, the observed data are very close to a perfect Gaussian bell curve. The posterior predictive lines closely match the observed data, meaning the model is a good fit to the data.
 
 Now let's look a bit closer at the posterior distributions of the fixed effect slope parameters. `summary()` only gives us a point estimate and the upper and lower bounds of the 95% quantile-based credible interval. That's a good start but we might want to explore the posterior distribution in more detail. After all, Bayesian inference gives us a fully characterized uncertainty distribution. We have 4000 posterior samples for each parameter. Let's use some functions from the **tidybayes** package to make tables and plots of the slope parameters.
 
@@ -486,28 +527,102 @@ We will show more examples of how to summarize and visualize predictions later o
 
 # Mixed-effects model with first and second level predictors
 
-Sex and extraversion are first-level predictors: they vary by individual student, even those that share the same class. A second-level predictor is one that is shared by all pupils in a class. In this dataset, the `texp` (teacher experience) variable is a second-level predictor because all pupils in the same "homeroom" class have the same teacher.
+Sex and extraversion are first-level predictors: they vary by individual student, even those that share the same class. A second-level predictor is one that is shared by all pupils in a class. In this dataset, the `texp` (teacher experience) variable is a second-level predictor because all pupils in the same "homeroom" class have the same teacher. 
 
-- texp is a predictor variable that is the same for all pupils in a class
-- we don't need to specify it any differently in the model though
+It does not require any different syntax to add a second-level predictor to the model. It is put in the model formula in exactly the same way as the first-level predictors. Here is another model with `texp` added as an additional fixed effect slope.
+
+```{r}
+fit_fixed12 <- brm(popular ~ 1 + sex + extrav + texp + (1 | class),  
+                   data = popular2data, 
+                   prior = c(
+                     prior(normal(0, 5), class = b)
+                   ),
+                   chains = 4, iter = 2000, warmup = 1000,
+                   seed = 703, file = 'fit_fixed12')
+```
+
+Look at the summary for this fit:
+
+```{r}
+summary(fit_fixed12)
+```
+
+We have strong evidence for a positive effect of teacher experience on the average popularity of pupils at the classroom level. 
+
+## Interactions between fixed effects
+
+We can also add any interaction terms we would like if we want to test whether any of the fixed effects interact. For example, is the effect of extraversion on popularity stronger for girls or boys? That would be an interaction between the two first-level terms `sex` and `extrav`. Or is the effect of extraversion on popularity stronger in classrooms with more experienced teachers? That would be a cross-level interaction between the first-level predictor `extrav` and the second-level predictor `texp`. 
+
+Regardless of what level the predictors are, you can specify the interaction between fixed effects `a` and `b` by adding `a:b` to the fixed-effect part of the model formula. For example, if you want to model the main effects of sex, extraversion, and teacher experience, and add an interaction between extraversion and teacher experience, the model formula would include `1 + sex + extrav + texp + extrav:texp`.
+
+I will leave the interaction model for you to fit as an exercise.
 
 # Mixed-effects model with random slopes
 
-- first do 1+sex+extrav|class
-- show that it's a very small value for the variance of sex slopes (could even show all of them)
-- this means that the individual classes' sex effects don't vary much from the overall fixed sex effect
-- we can refit the model without this random slope
-- wouldn't make sense to have a random slope for texp because texp is the same for all pupils in a class
+So far, we have assumed that any effect of the predictor variables is constant across all the classes. We've allowed the intercept for popularity to be different from class to class, but not the slope with respect to a predictor variable. We can add *random slopes* terms to the model to allow not only the intercept, but also the slope, of the popularity-extraversion relationship to vary by class. 
 
-# Mixed-effects model with random slopes and cross-level interaction
+To specify random slopes, we modify the *design* side of the random-effect term. For our random intercept model, we used `(1|class)`. To fit a random slope for each class with respect to extraversion, we would use `(1 + extrav|class)`. To fit a random slope for both extraversion and sex, we would use `(1 + extrav + sex|class)`.
 
-- just add extrav:texp. This is the same way you'd do interaction within levels.
+Let's go ahead and try to include random slopes for both the first-level predictors, `sex` and `extrav`. Note that it doesn't make sense to have a random slope for `texp` with respect to class, because `texp` is the same for all individuals in a class. We can't estimate a slope of teacher experience versus popularity within an individual class.
 
-# Estimated marginal means
+> Note: this model may take a little longer to sample than the previous ones (~2 minutes on my laptop).
+
+```{r}
+fit_randomslopes <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav + sex | class),  
+                   data = popular2data, 
+                   prior = c(
+                     prior(normal(0, 5), class = b)
+                   ),
+                   chains = 4, iter = 2000, warmup = 1000,
+                   seed = 709, file = 'fit_randomslopes')
+```
+
+Let's take a look at this fit.
+
+```{r}
+summary(fit_randomslopes)
+```
+
+You can see from the summary that the standard deviation of the random slope for sex is very small (point estimate of 0.06, lower bound of 95% credible interval less than 0.01). Given that the fixed component of the slope for sex is estimated to be about 1.25, we can probably omit the random slope for sex from the model without losing much explanatory power.
+
+To confirm this, plot the posterior credible intervals of the class-level slopes for sex (sum of fixed and random components). The black dots are the medians.
+
+```{r}
+sex_slopes <- spread_draws(fit_randomslopes, b_sexgirl, r_class[class,variable]) %>%
+  filter(variable == 'sexgirl') %>%
+  mutate(slope = b_sexgirl + r_class)
+
+sex_slopes %>% 
+  median_qi(slope, .width = c(.66, .90, .95)) %>%
+  ggplot(aes(y = class, x = slope, xmin = .lower, xmax = .upper)) +
+  geom_interval() +
+  geom_point(size = 2) +
+  scale_color_brewer(palette = 'Blues')
+```
+
+This plot is not really possible to make in a frequentist analysis (unless you tried some fancy bootstrapping techniques) but it is easy as pie in a Bayesian context. As you can see from the plot, although we allowed the relationship between sex and popularity to vary from class to class, the model found that the class-level error was very low. All the slopes are between 1.2 and 1.3. Therefore we can refit the model without the random slope for sex (but retaining the one for extraversion).
+
+```{r}
+fit_extravrandomslope <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav | class),  
+                             data = popular2data, 
+                             prior = c(
+                               prior(normal(0, 5), class = b)
+                             ),
+                             chains = 4, iter = 2000, warmup = 1000,
+                             seed = 206, file = 'fit_extravrandomslope')
+
+summary(fit_extravrandomslope)
+```
+
+# Comparing models with information criteria
+
+The models with different specifications for fixed and random effects have different numbers of parameters 
 
 # Bayes Factors
 
-# Comparing models with information criteria
+"Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $$\frac{P(model_1|data)}{P(model_2|data)}$$. In our 
+
+SFD DFawerawer ADD MORE WORDS HERE
 
 # Conclusion
 
