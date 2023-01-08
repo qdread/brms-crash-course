@@ -15,12 +15,13 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 <!--
 TO DO:
 
-- add more convincing explanation of why bayes is good, including description of how you can get a distribution for any quantity you want
-- write some exercises
+- write some exercises (not necessary for now)
 - clean up headings
 - estimated marginal means will be added to a future lesson
-- credible intervals need to be explained better
 - pp_check needs to be explained better
+- LOOIC part
+- Bayes factor part
+- emmeans or predictions part
 -->
 
 # Introduction
@@ -97,7 +98,7 @@ This may not make sense yet but some more concrete examples might help.
 
 Let's say *A* is a statistical model. A statistical model is a hypothesis about the world. We want to know the probability that our hypothesis is true. We start out with some prior knowledge about the probability that our model *A* is true. So $$P(A)$$ is called the **prior probability**. We go out there and get some data *B* to test our hypothesis. We can calculate the probability of observing that data *B*, given that *A* is true: $$P(B|A)$$. This is also known as the **likelihood** of the model *A*, in light of our observations *B*. We use this to update our estimate of the probability that *A* is true. We now have $$P(A|B)$$, the probability our model, or hypothesis, is true, given the data we just observed. 
 
-Notice we ignored the denominator, $$P(B)$$. This is called the **marginal probability**. We can usually ignore it in the context of statistical inference. That's because the best we can do is to compare the relative probability of two models, given the data. We can't really say (nor should we say) what the absolute probability of a model is. If we only have one dataset, there's only one $$P(B)$$. If we are comparing two models $A_1$ and $A_2$ and we take the ratio $$\frac{P(A_1|B)}{P(A_2|B)}$$, the two $$P(B)$$s cancel out. Thus we don't really need to care about $$P(B)$$ in practice.
+Notice we ignored the denominator, $P(B)$, the probability that the model is true. This is called the **marginal probability**. We can usually ignore it in the context of statistical inference. That's because the best we can do is to compare the relative probability of different models, given the data. We can't really say (nor should we say) what the absolute probability of a model is. ("All models are wrong.") If we are comparing two models $A_1$ and $A_2$, both fit using the same data $B$, and we take the ratio $\frac{P(A_1|B)}{P(A_2|B)} = \frac{P(B|A_1)P(A_1)/P(B)}{P(B|A_2)P(A_2)/P(B)}$, the two $P(B)$s cancel out. Thus we don't really need to care about $P(B)$ in practice.
 
 So we can get rid of the denominator and write Bayes' theorem as
 
@@ -406,7 +407,7 @@ median(post_samples_intercept)
 quantile(post_samples_intercept, c(0.05, 0.95))
 ```
 
-A useful thing about Bayesian models is that you can get a posterior distribution, and any credible interval you want, for any component of the model: parameter estimates, predicted values, etc. This is much harder to do in a frequentist model. We will see some of that later on in the model.
+A useful thing about Bayesian models is that you can get a posterior distribution, and any credible interval you want, for any component of the model: parameter estimates, predicted values, etc. This is much harder to do in a frequentist model. We will see some of that later on in the model &mdash; and we will see some really cool ways to visualize the information contained in posterior distributions, including credible intervals.
 
 ## Variance decomposition
 
@@ -436,13 +437,7 @@ Notice the `seed` and `file` arguments.
 - The `seed` argument (you can use any integer you want) sets the random seed so that we can reproduce the exact behavior of the MCMC chains again in case we need to refit the model. This is very important for reproducibility!
 - The `file` argument means a file called `fit_fixedslopes.rds` is created in your current working directory. This means that you can reload the fitted model object in a future R session without having to compile and sample the model again. If you run the same `brm` code again, it will look for the file and load it instead of refitting the model. This can save a lot of time if you have a model that takes hours or days to sample!
 
-Look at the density plots and trace plots of the posterior distributions of the parameters.
-
-```{r}
-plot(fit_fixedslopes)
-```
-
-Looks like they all converged. `summary()` shows low R-hat statistics and also shows that most of the mass of the posterior distribution for the slopes is well above zero. This indicates a strong positive effect of sex (because boy = 0 and girl = 1 this means girls are more popular than boys on average) and a strong positive effect of extraversion (more outgoing students are more popular). We have roughly the same random effect variance parameter as before, but now `sigma` (the standard deviation of the residuals for individual pupils) is a lot lower than before. This makes sense because we have some effects in the model that explain some of the variance and result in lower residuals.
+`summary()` shows low R-hat statistics and also shows that most of the mass of the posterior distribution for the slopes is well above zero. This indicates a strong positive effect of sex (because boy = 0 and girl = 1 this means girls are more popular than boys on average) and a strong positive effect of extraversion (more outgoing students are more popular). We have roughly the same random effect variance parameter as before, but now `sigma` (the standard deviation of the residuals for individual pupils) is a lot lower than before. This makes sense because we have some effects in the model that explain some of the variance and result in lower residuals.
 
 ```{r}
 summary(fit_fixedslopes)
@@ -541,6 +536,8 @@ fit_fixed12 <- brm(popular ~ 1 + sex + extrav + texp + (1 | class),
                    seed = 703, file = 'fit_fixed12')
 ```
 
+> Note: I am not going to include `plot(fit)` or `pp_check(fit)` explicitly in this tutorial anymore in the interest of space. But you should always generate those diagnostics for any model you fit as a matter of routine.
+
 Look at the summary for this fit:
 
 ```{r}
@@ -616,13 +613,31 @@ summary(fit_extravrandomslope)
 
 # Comparing models with information criteria
 
-The models with different specifications for fixed and random effects have different numbers of parameters 
+The models with different specifications for fixed and random effects have different numbers of parameters. We have used the `pp_check()` plot to "eyeball" how well the models fit the data. We can also use leave-one-out (LOO) cross-validation to produce an information criterion for any of the models we've fit so far, and then compare them. In **brms** this is a two-step process. First use `add_criterion()` to compute an information criterion for each model, then use `loo_compare()` to rank a set of models by information criterion.
+
+Let's compare all the models we've fit: the intercept-only model, the model with fixed effects for the first-level predictors only, the model with all first-level and second-level fixed effects and random intercepts, the model with all fixed effects and random slopes with respect to sex and extraversion, and the model with all fixed effects and only the extraversion random slope.
+
+```{r}
+fit_interceptonly_moresamples <- add_criterion(fit_interceptonly_moresamples, 'loo')
+fit_fixedslopes_priors <- add_criterion(fit_fixedslopes_priors, 'loo')
+fit_fixed12 <- add_criterion(fit_fixed12, 'loo')
+fit_randomslopes <- add_criterion(fit_randomslopes, 'loo')
+fit_extravrandomslope <- add_criterion(fit_extravrandomslope, 'loo')
+
+loo_compare(fit_interceptonly_moresamples, fit_fixedslopes_priors, fit_fixed12, fit_randomslopes, fit_extravrandomslope)
+```
 
 # Bayes Factors
 
 "Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $$\frac{P(model_1|data)}{P(model_2|data)}$$. In our 
 
 SFD DFawerawer ADD MORE WORDS HERE
+
+# Parameter and prediction plots
+
+To finish up, let's make a few more plots visualizing the output of our fitted model. In all cases, we are going to plot the medians of posterior distributions of parameters or expected values as points, and quantile-based credible intervals to show uncertainty.
+
+ADD MORE HERERERERE
 
 # Conclusion
 
