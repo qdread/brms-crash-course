@@ -627,11 +627,25 @@ fit_extravrandomslope <- add_criterion(fit_extravrandomslope, 'loo')
 loo_compare(fit_interceptonly_moresamples, fit_fixedslopes_priors, fit_fixed12, fit_randomslopes, fit_extravrandomslope)
 ```
 
+This output ranks the models from best fit to worst by ELPD, or expected log pointwise predictive density (a measure of how well the model fit to all but one data point from the original dataset predicts the new data point). The `elpd_diff` column is the difference between each other model and the one with the highest ELPD (thus the top row will always have `elpd_diff` of zero). The `se_diff` column is the standard error of that difference. 
+
+We see that the fit with only the extraversion random slope is ranked best in our comparison. The model with both random slopes has a difference of 0.3 ELPD from the best model, but the standard error of that difference is 0.7. This is basically a "tie" so we can safely go with the simpler of the two: `fit_extravrandomslope`. The models without any random slopes perform far worse (by about 40 log units), and the intercept-only model is a very bad fit (not surprisingly).
+
 # Bayes Factors
 
-"Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $$\frac{P(model_1|data)}{P(model_2|data)}$$. In our 
+"Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $$\frac{P(model_1|data)}{P(model_2|data)}$$. BFs can range from 0 to infinity. A BF of 1 means a 1:1 ratio (we have equal evidence for both models). As BF increases, we have more and more evidence for model 1.
 
-SFD DFawerawer ADD MORE WORDS HERE
+There's no universally agreed-upon "cutoff" for declaring "significance" of a BF. There are two different interpretation tables shown in the [Wikipedia article on Bayes factors](https://en.wikipedia.org/wiki/Bayes_factor). Roughly speaking, a BF of 10 or greater would indicate strong evidence.
+
+The R package **bayestestR** allows us to compute a BF for individual model parameters by calculating the ratio of evidence for the posterior to evidence for the prior distribution of each parameter. We can use these values as a measure of the strength of evidence for each parameter's posterior being different than the prior. Because our prior distributions were centered around zero, we can consider them roughly like "null hypotheses." Thus a BF = 1 means our data didn't change our belief about the "null" prior at all, BF > 1 would mean we have stronger evidence for the posterior, and BF < 1 means we believe *more* in our original null prior after seeing the data.
+
+```{r}
+bayesfactor_parameters(fit_extravrandomslope)
+```
+
+Here we see that BF < 1 for the intercept, which makes sense because we chose a prior that was just centered around the mean of the data. BF > 1000 for all the fixed effect slopes. This means we have very strong evidence for all three effects. This is also not surprising because we simulated the data in that way.
+
+> Warning: Bayes factors are very sensitive to your choice of prior. This is true even if your prior has little or no influence on the shape of the posterior. If you do decide to report BFs in a publication, be sure to carefully document how they were calculated.
 
 # Parameter and prediction plots
 
@@ -643,7 +657,7 @@ ADD MORE HERERERERE
 
 What did we just learn? Let's take a look back at the learning objectives!
 
-xxxxx
+xxxxx ALSO REVISE THE ORIGINAL LOs
 
 # Going further
 
