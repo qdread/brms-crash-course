@@ -1,26 +1,37 @@
 ---
-title: "BRMS crash course"
-author: "Quentin D. Read"
-format: revealjs
+title: "A crash course in Bayesian mixed models with brms"
+format: 
+  revealjs:
+    code-overflow: wrap
+execute:
+  echo: true
+  eval: false
 ---
 
-## Quarto
+## What is this class?
 
-Quarto enables you to weave together content and executable code into a finished presentation. To learn more about Quarto presentations see <https://quarto.org/docs/presentations/>.
+- A brief and practical introduction to fitting Bayesian multilevel models in R and Stan
+- Using **brms** (**B**ayesian **R**egression **M**odels using **S**tan)
+- Quick intro to Bayesian inference
+- Mostly practical skills
 
-## Bullets
+---
 
-When you click the **Render** button a document will be generated that includes:
+### Minimal prerequisites {.smaller}
 
--   Content authored with markdown
--   Output from executable code
+- Know what mixed-effects or multilevel model is
+- A little experience with stats and/or data science in R
+- Vague knowledge of what Bayesian stats are
 
-## Code
+### Advanced prerequisites
 
-When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
+- Knowing about the **lme4** package will help
+- Knowing about **tidyverse** and **ggplot2** will help
 
-```{r}
-1 + 1
-```
+---
 
+### How to follow the course
 
+- Slides and text version of lessons are online
+- Fill in code in the worksheet
+- You can always copy and paste from text lesson if you fall behind
