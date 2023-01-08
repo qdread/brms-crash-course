@@ -33,5 +33,365 @@ execute:
 ### How to follow the course
 
 - Slides and text version of lessons are online
-- Fill in code in the worksheet
-- You can always copy and paste from text lesson if you fall behind
+- Fill in code in the worksheet (replace `...` with code)
+- You can always copy and paste code from text version of lesson if you fall behind
+
+---
+
+### Conceptual learning objectives {.smaller}
+
+At the end of this course, you will understand ...
+
+- The basics of Bayesian inference
+- What a prior, likelihood, and posterior are
+- The basics of how Markov Chain Monte Carlo works
+- What a credible interval is
+
+---
+
+### Practical learning objectives {.smaller}
+
+At the end of this course, you will be able to ...
+
+- Write **brms** code to fit a multilevel model with random intercepts and random slopes
+- Diagnose and deal with convergence problems
+- Interpret **brms** output
+- Compare models with LOO information criteria
+- Use Bayes factors to assess strength of evidence for effects
+- Make plots of model parameters and predictions with credible intervals 
+
+## What is Bayesian inference?
+
+![](https://upload.wikimedia.org/wikipedia/commons/d/d4/Thomas_Bayes.gif)  
+
+## What is Bayesian inference?
+
+A method of statistical inference that allows you to use information you already know to assign a prior probability to a hypothesis, then update the probability of that hypothesis as you get more information
+
+- Used in many disciplines and fields
+- We're going to look at how to use it to estimate parameters of statistical models to analyze scientific data
+- Powerful, user-friendly, open-source software is making it easier for everyone to go Bayesian
+
+## Bayes' Theorem
+
+![](https://static.scientificamerican.com/blogs/cache/file/5687448D-1F52-4287-A13D53F37A35BE41_source.jpg)
+
+- Thomas Bayes, 1763
+- Pierre-Simon Laplace, 1774
+
+## Bayes' Theorem
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+- How likely an event is to happen based on our prior knowledge about conditions related to that event
+- The *conditional* probability of an event *A* occurring, conditioned on the probability of another event *B* occurring
+
+## Bayes' Theorem
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+The **probability of A being true given that B is true** ($$P(A|B)$$) is equal to the **probability that B is true given that A is true** ($$P(B|A)$$) times the **ratio of probabilities that A and B are true** ($$\frac{P(A)}{P(B)}$$)
+
+---
+
+### Bayes' theorem and statistical inference
+
+- Let's say $A$ is a statistical model (a hypothesis about the world)
+- How probable is it that our hypothesis is true?
+- $P(A)$: *prior probability* that we assign based on our subjective knowledge before we get any data
+
+---
+
+### Bayes' theorem and statistical inference
+
+- We go out and get some data $B$
+- $P(B|A)$: *likelihood* is the probability of observing that data if our model $A$ is true
+- Use the likelihood to update our estimate of probability of our model
+- $P(A|B)$: *posterior probability* that model $A$ is true, given that we observed $B$.
+
+---
+
+### Bayes' theorem and statistical inference
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+- What about $P(B)$?
+- *marginal probability*, the probability of the data
+- Basically just a normalizing constant
+- If we are comparing two models with the same data, the two $P(B)$s cancel out
+
+---
+
+### Restating Bayes' theorem
+
+$$P(model|data) \propto P(data|model)P(model)$$
+
+$$posterior = likelihood \times prior$$
+
+*what we believed before about the world (prior) &times; how much our new data changes our beliefs (likelihood) = what we believe now about the world (posterior)*
+
+## Example
+
+- Find a coin on the street. What is our prior estimate of the probability of flipping heads?
+- Now we flip 10 times and get 8 heads. What is our belief now?
+- Probably doesn't change much because we have a strong prior and the likelihood of probability = 0.5 is still high enough even if we see 8/10 heads
+
+---
+
+- Shady character on the street shows us a coin and offers to flip it. He will pay \$1 for each tails if we pay \$1 for each heads
+- What is our prior estimate of the probability?
+- He flips 10 times and gets 8 heads. What's our belief now?
+
+![](https://i.ytimg.com/vi/A-L7KOjyDrE/maxresdefault.jpg)
+
+---
+
+- In classical "frequentist" analysis we cannot incorporate prior information into the analysis
+- In each case our point estimate of the probability would be 0.8
+
+## Bayes is computationally intensive
+
+- $P(data|model)$, the likelihood, is needed to get $P(model|data)$, the posterior
+- But the "model" is not just one parameter, it might be 100s or 1000s of parameters
+- Need to integrate a probability distribution with 100s or 1000s of dimensions
+- For many years, this was computationally not possible
+
+## Markov Chain Monte Carlo (MCMC)
+
+- Class of algorithms for sampling from probability distributions
+- The longer the chain runs, the closer it gets to the true distribution
+- In Bayesian inference, we run multiple Markov chains for a preset number of samples
+- Discard the initial samples (warmup)
+- What remains is our estimate of the posterior distribution
+
+## Hamiltonian Monte Carlo (HMC) and Stan
+
+![](https://mc-stan.org/images/stan_logo.png)
+
+- HMC is the fastest and most efficient MCMC algorithm that has ever been developed
+- It's implemented in software called Stan
+
+## What is brms?
+
+![](https://raw.githubusercontent.com/paul-buerkner/brms/master/man/figures/brms.png)
+
+- An easy way to fit Bayesian mixed models using Stan in R
+- Syntax of **brms** models is just like **lme4** 
+- Runs a Stan model behind the scenes
+- Automatically assigns sensible priors and does lots of tricks to speed up HMC convergence
+
+## Why use Bayes?
+
+- Some models just can't be fit with frequentist maximum-likelihood methods
+- Estimate how big effects are instead of yes-or-no framework of rejecting a null hypothesis
+- We can say "the probability of something being between a and b is 95%" instead of "if we ran this experiment many times, 95% of the confidence intervals would contain this value."
+
+---
+
+Let's finally fit some Bayesian models!
+
+## Setup
+
+Load packages.
+
+```{r}
+library(brms)
+library(tidyverse)
+library(emmeans)
+library(tidybayes)
+library(easystats)
+```
+
+---
+
+Set plotting theme.
+
+```{r}
+theme_set(theme_minimal())
+```
+
+Set **brms** options (back-end and cores).
+
+```{r}
+options(brms.backend = 'cmdstanr', mc.cores = 4)
+```
+
+---
+
+## The data
+
+Read the simulated popularity dataset from CSV on GitHub
+
+```{r}
+popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
+```
+
+---
+
+### Examine the data
+
+- `pupil`: numeric ID for each individual, nested within each class (between 16 and 26 pupils per class)
+- `class`: numeric ID for each classroom (1-100)
+- `extrav`: numerical score for extraversion (1-10)
+- `sex`: binary variable (0 = boy, 1 = girl)
+- `texp`: numerical score for teacher experience level (2-25). Same for all pupils in the same classroom
+- `popular`: continuous score (0-10) of the popularity of each individual student (outcome variable)
+
+---
+
+Convert `sex` to a labeled factor
+
+```{r}
+popular2data <- mutate(popular2data, sex = factor(sex, labels = c('boy', 'girl')))
+```
+
+## Exploratory plots
+
+- Look at relationship between popularity `popular` and extraversion `extrav`
+- I will not explain **ggplot2** code for now
+- Extraversion values are jittered in x direction
+
+```{r}
+(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrav, y = popular)) +
+  geom_point(size = 1.2,
+             alpha = .8,
+             position = position_jitter(width = .2, height = 0)) +
+  ggtitle('Popularity vs. extraversion'))
+```
+
+---
+
+Add trendline.
+
+```{r}
+pop_vs_ext +
+  geom_smooth(method = lm, se = FALSE) +
+  ggtitle('Popularity vs. extraversion', subtitle = 'overall trendline')
+```
+
+---
+
+Take multilevel structure of data into account (color by class).
+
+```{r}
+(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrav, y = popular, color = class, group = class)) +
+   geom_point(size = 1.2,
+              alpha = .8,
+              position = position_jitter(width = .2, height = 0)) +
+   theme(legend.position = 'none') +
+   scale_color_distiller(palette = 'Set1') +
+   ggtitle('Popularity vs. extraversion', 'points colored by class'))
+```
+
+---
+
+Add class-level trendlines.
+
+```{r}
+pop_vs_ext_colored + 
+  geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
+  ggtitle('Popularity vs. extraversion', 'trendline by class')
+```
+
+---
+
+Highlight classes with most extreme trends.
+
+```{r}
+popular2data %>%
+  group_by(class) %>%
+  mutate(slope = lm(popular ~ extrav)$coefficients[2]) %>%
+  ungroup %>%
+  mutate(high_or_low = case_when(
+    slope >= sort(unique(slope))[98] ~ 'high',
+    slope <= sort(unique(slope))[3] ~ 'low',
+    TRUE ~ 'mid'
+  )) %>%
+  ggplot(aes(x = extrav, y = popular, group = class)) +
+  geom_point(size = 1.2,
+              alpha = .8,
+              position = position_jitter(width = .2, height = 0)) +
+  geom_smooth(aes(color = high_or_low, size = high_or_low), 
+              method = lm, se = FALSE) +
+  theme(legend.position = 'none') +
+  scale_color_manual(values = c(high = 'blue', low = 'red', mid = 'gray50')) +
+  scale_size_manual(values = c(high = 1.2, low = 1.2, mid = 0.6)) +
+  ggtitle('Popularity vs. extraversion', 'highlighting 6 classes with most extreme relationship')
+```
+
+## Fitting models {.smaller}
+
+For reference this is mixed model syntax from **lme4** package:
+
+```{r}
+lmer(popular ~ 1 + (1 | class), data = popular2data)
+```
+
+- Dependent or response variable (`popular`) on left side
+- Tilde `~` separates dependent from independent variables
+- Here the only fixed effect is the global intercept (`1`)
+- Random effects specification (`(1 | class)`) has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`.
+- In this case, the `1` on the design side means only fit random intercepts and no random slopes
+- `class` on the group side means each class will get its own random intercept
+
+---
+
+### Our first Bayesian multilevel model!
+
+```{r}
+fit_interceptonly <- brm(popular ~ 1 + (1 | class),
+                         data = popular2data,
+                         chains = 2,
+                         iter = 200,
+                         warmup = 100,
+                         init = 'random')
+```
+
+- Same formula as **lme4** but with some extra instructions for the HMC sampler
+  + Number of Markov chains
+  + Iterations for each chain
+  + How many iterations to discard as warmup
+  + Random initial values
+  + No priors specified, so defaults are used
+  
+---
+
+### Model output
+
+```{r}
+summary(fit_interceptonly)
+```
+
+- Warning about convergence 
+- `Rhat > 1.05` for some parameters
+- `Rhat` indicates convergence of MCMC chains, approaching 1 at convergence
+- `Rhat < 1.01` is ideal
+
+---
+
+```{r}
+plot(fit_interceptonly)
+```
+
+Posterior distributions and trace plots for
+
+- the fixed effect intercept (`b_Intercept`)
+- the standard deviation of the random class intercepts (`sd_class__Intercept`)
+- the standard deviation of the model's residuals (`sigma`)
+
+---
+
+### Dealing with convergence problems
+
+- Warning says either increase iterations or set stronger priors
+- Increase iterations to 1000 warmup, 1000 sampling per chain (2000 total)
+- `update()` lets us draw more samples without recompiling code
+
+```{r}
+fit_interceptonly_moresamples <- update(fit_interceptonly, chains = 2, iter = 2000, warmup = 1000)
+
+plot(fit_interceptonly_moresamples)
+
+summary(fit_interceptonly_moresamples)
+```
+
+## Credible intervals

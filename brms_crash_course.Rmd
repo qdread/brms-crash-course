@@ -85,15 +85,15 @@ The mathematical statement of Bayes' theorem is:
 
 $$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
 
-This means the **probability of A being true given that B is true** ($$P(A|B)$$) is equal to the **probability that B is true given that A is true** ($$P(B|A)$$) times the **ratio of probabilities that A and B are true** ($$\frac{P(A)}{P(B)}$$). 
+This means the **probability of A being true given that B is true** ($P(A|B)$) is equal to the **probability that B is true given that A is true** ($P(B|A)$) times the **ratio of probabilities that A and B are true** ($\frac{P(A)}{P(B)}$). 
 
 This may not make sense yet but some more concrete examples might help.
 
 ## How Bayes' theorem relates to statistical inference
 
-Let's say *A* is a statistical model. A statistical model is a hypothesis about the world. We want to know the probability that our hypothesis is true. We start out with some prior knowledge about the probability that our model *A* is true. So $$P(A)$$ is called the **prior probability**. We go out there and get some data *B* to test our hypothesis. We can calculate the probability of observing that data *B*, given that *A* is true: $$P(B|A)$$. This is also known as the **likelihood** of the model *A*, in light of our observations *B*. We use this to update our estimate of the probability that *A* is true. We now have $$P(A|B)$$, the probability our model, or hypothesis, is true, given the data we just observed. 
+Let's say $A$ is a statistical model. A statistical model is a hypothesis about the world. We want to know the probability that our hypothesis is true. We start out with some prior knowledge about the probability that our model $A$ is true. So $P(A)$ is called the **prior probability**. We go out there and get some data $B$ to test our hypothesis. We can calculate the probability of observing that data $B$, given that $A$ is true: $P(B|A)$. This is also known as the **likelihood** of the model $A$, in light of our observations $B$. We use this to update our estimate of the probability that $A$ is true. We now have $P(A|B)$, the probability our model, or hypothesis, is true, given the data we just observed. 
 
-Notice we ignored the denominator, $P(B)$, the probability that the model is true. This is called the **marginal probability**. We can usually ignore it in the context of statistical inference. That's because the best we can do is to compare the relative probability of different models, given the data. We can't really say (nor should we say) what the absolute probability of a model is. ("All models are wrong.") If we are comparing two models $A_1$ and $A_2$, both fit using the same data $B$, and we take the ratio $\frac{P(A_1|B)}{P(A_2|B)} = \frac{P(B|A_1)P(A_1)/P(B)}{P(B|A_2)P(A_2)/P(B)}$, the two $P(B)$s cancel out. Thus we don't really need to care about $P(B)$ in practice.
+Notice we ignored the denominator, $P(B)$, the probability that the data are true. This is called the **marginal probability**. We can usually ignore it in the context of statistical inference. That's because the best we can do is to compare the relative probability of different models, given the data. We can't really say (nor should we say) what the absolute probability of a model is. ("All models are wrong.") If we are comparing two models $A_1$ and $A_2$, both fit using the same data $B$, and we take the ratio $\frac{P(A_1|B)}{P(A_2|B)} = \frac{P(B|A_1)P(A_1)/P(B)}{P(B|A_2)P(A_2)/P(B)}$, the two $P(B)$s cancel out. Thus we don't really need to care about $P(B)$ in practice.
 
 So we can get rid of the denominator and write Bayes' theorem as
 
@@ -125,7 +125,7 @@ In a classical, "frequentist" analysis, there is no formal way to incorporate pr
 
 The coin flip example was pretty easy &mdash; you can do it in your head! Why do we need such advanced computational tools to do Bayesian inference?
 
-The main reason that Bayesian statistics were not widely adopted initially is probably a practical one. It boils down to $$P(data|model)$$, the likelihood, which we need to calculate to estimate $$P(model|data)$$, the posterior. If our "model" is just a single parameter like the probability of a coin flip being heads, and our "data" is just a count of heads out of 10, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $$P(model|data)$$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
+The main reason that Bayesian statistics were not widely adopted initially is probably a practical one. It boils down to $P(data|model)$, the likelihood, which we need to calculate to estimate $P(model|data)$, the posterior. If our "model" is just a single parameter like the probability of a coin flip being heads, and our "data" is just a count of heads out of 10, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $P(model|data)$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
 
 If you remember even trying to do two-dimensional integration on paper from calculus class, imagine doing 100-dimensional integration or even more! There just isn't enough time in the universe to get a precise solution for an integral with that many dimensions. In the time of Thomas Bayes, and for hundreds of years after that, Bayesian statistics simply couldn't be applied to real-world problems because of this computational limitation.
 
@@ -205,7 +205,7 @@ glimpse(popular2data)
 
 There are quite a few columns but we only need to be concerned with a few:
 
-- `pupil`: a numeric ID for each individual (1-26). Note that the IDs are "recycled" within each class. For example pupil 1 in class 1 is not the same person as pupil 1 in class 2.
+- `pupil`: a numeric ID for each individual (1-26). Note that the IDs are nested, meaning the same ID is reused from class to class. For example pupil 1 in class 1 is not the same person as pupil 1 in class 2.
 - `class`: a numeric ID for each class (1-100). 
 - `extrav`: a numerical score for extraversion, or how outgoing each individual is (1-10).
 - `sex`: a binary variable (0 = boy, 1 = girl).
