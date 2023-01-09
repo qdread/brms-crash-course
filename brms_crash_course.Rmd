@@ -37,8 +37,8 @@ This course is designed for practicing researchers who have some experience with
 
 ### Advanced prerequisites
 
-- If you have experience with the R package **lme4**, that's great because the syntax of the R package **brms** is modeled after **lme4**.
-- If you have experience with the R **tidyverse** packages, including **ggplot2**, for manipulating and plotting data, that's also great because we will be using them in this course.
+- If you have experience with the R package [**lme4**](https://cran.r-project.org/package=lme4), that's great because the syntax of **brms** is modeled after **lme4**.
+- If you have experience with the [**tidyverse**](https://www.tidyverse.org/) packages, including [**ggplot2**](https://ggplot2.tidyverse.org/), for manipulating and plotting data, that's also great because we will be using them in this course.
 
 If you don't know what those packages are, don't sweat it because you can just follow along by copying the code.
 
@@ -71,7 +71,7 @@ At the end of this course, you will be able to ...
 
 In its simplest form, Bayesian inference is a method of statistical inference that allows you to use information you already know to assign a prior probability to a hypothesis, then update the probability of that hypothesis as you get more information. If that seems like common sense, it is! 
 
-It is a very powerful tool that has been applied across many fields of human endeavor. Today we are only going to look at its application in estimating the parameters of multilevel statistical models to analyze scientific data, but that's only one of the many things we can use Bayesian inference for. Bayesian methods are only growing in popularity, thanks in large part to the rapid growth of user-friendly, open-source, computationally powerful software -- like Stan and its companion R package **brms** that we are going to learn about today!
+It is a very powerful tool that has been applied across many fields of human endeavor. Today we are only going to look at its application in estimating the parameters of multilevel statistical models to analyze scientific data, but that's only one of the many things we can use Bayesian inference for. Bayesian methods are only growing in popularity, thanks in large part to the rapid growth of user-friendly, open-source, computationally powerful software -- like [**Stan**](https://mc-stan.org/) and its companion R package [**brms**](https://paul-buerkner.github.io/brms/) that we are going to learn about today!
 
 Bayesian inference is named after Reverend Thomas Bayes, an English clergyman, philosopher, and yes, statistician, who wrote a scholarly work on probability (published after his death in 1763). His essay included an algorithm to use evidence to find the distribution of the probability parameter of a binomial distribution ... using what we now call Bayes' Theorem! However, much of the foundations of Bayesian inference were really developed by Pierre-Simon Laplace independently of Bayes and at roughly the same time. Give credit where it's due!
 
@@ -167,7 +167,7 @@ I think I have gone on long enough talking about why to use Bayesian inference. 
 
 # Setup
 
-You should have already installed the R packages **brms** and **cmdstanr**, and used **cmdstanr** to install CmdStan on your personal computer. We will also be using the **tidyverse**, **emmeans**, and **tidybayes** packages today.
+You should have already installed the R packages **brms** and [**cmdstanr**](https://mc-stan.org/cmdstanr/), and used **cmdstanr** to install CmdStan on your personal computer. We will also be using the [**tidyverse**](tidyverse.org), [**emmeans**](https://cran.r-project.org/package=emmeans), [**tidybayes**](http://mjskay.github.io/tidybayes/), and [**easystats**](https://easystats.github.io/easystats/) packages today.
 
 ```{r load packages}
 library(brms)
@@ -297,7 +297,7 @@ popular2data %>%
 
 ## Intercept-only model
 
-If you have ever fit a mixed model using the R package **lme4**, this will look familiar to you:
+If you have ever fit a mixed model using **lme4**, this will look familiar to you:
 
 ```{r, eval = FALSE}
 lmer(popular ~ 1 + (1 | class), data = popular2data)
@@ -418,7 +418,7 @@ A useful thing about Bayesian models is that you can get a posterior distributio
 
 ## Variance decomposition
 
-It is a good idea to examine the proportions of variance at different levels in your nested dataset. In this case we can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the **performance** package (part of **easystats**), which also gives us a credible interval. We'll use 99%.
+It is a good idea to examine the proportions of variance at different levels in your nested dataset. In this case we can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the [**performance**](https://easystats.github.io/performance/) package (part of [**easystats**](https://easystats.github.io/easystats/)), which also gives us a credible interval. We'll use 99%.
 
 ```{r}
 variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
@@ -492,7 +492,7 @@ This plot shows a density plot of the observed data (black line) and density plo
 
 ## Plotting posterior estimates
 
-Now let's look a bit closer at the posterior distributions of the fixed effect slope parameters. `summary()` only gives us a point estimate and the upper and lower bounds of the 95% quantile-based credible interval. That's a good start but we might want to explore the posterior distribution in more detail. After all, Bayesian inference gives us a fully characterized uncertainty distribution. We have 4000 posterior samples for each parameter. Let's use some functions from the **tidybayes** package to make tables and plots of the slope parameters.
+Now let's look a bit closer at the posterior distributions of the fixed effect slope parameters. `summary()` only gives us a point estimate and the upper and lower bounds of the 95% quantile-based credible interval. That's a good start but we might want to explore the posterior distribution in more detail. After all, Bayesian inference gives us a fully characterized uncertainty distribution. We have 4000 posterior samples for each parameter. Let's use some functions from the [**tidybayes**](http://mjskay.github.io/tidybayes/) package to make tables and plots of the slope parameters.
 
 First we use `gather_draws()` to pull out the posterior samples for some variables of our choosing and make a "tidy" data frame out of them.
 
@@ -646,11 +646,11 @@ We see that the fit with only the extraversion random slope is ranked best in ou
 
 ## Assessing strength of evidence with Bayes factors
 
-"Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $$\frac{P(model_1|data)}{P(model_2|data)}$$. BFs can range from 0 to infinity. A BF of 1 means a 1:1 ratio (we have equal evidence for both models). As BF increases, we have more and more evidence for model 1.
+"Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $\frac{P(model_1|data)}{P(model_2|data)}$. BFs can range from 0 to infinity. A BF of 1 means a 1:1 ratio (we have equal evidence for both models). As BF increases, we have more and more evidence for model 1.
 
 There's no universally agreed-upon "cutoff" for declaring "significance" of a BF. There are two different interpretation tables shown in the [Wikipedia article on Bayes factors](https://en.wikipedia.org/wiki/Bayes_factor). Roughly speaking, a BF of 10 or greater would indicate strong evidence.
 
-The R package **bayestestR** allows us to compute a BF for individual model parameters by calculating the ratio of evidence for the posterior to evidence for the prior distribution of each parameter. We can use these values as a measure of the strength of evidence for each parameter's posterior being different than the prior. Because our prior distributions were centered around zero, we can consider them roughly like "null hypotheses." Thus a BF = 1 means our data didn't change our belief about the "null" prior at all, BF > 1 would mean we have stronger evidence for the posterior, and BF < 1 means we believe *more* in our original null prior after seeing the data.
+The R package [**bayestestR**](https://easystats.github.io/bayestestR/), also part of **easystats**, allows us to compute a BF for individual model parameters by calculating the ratio of evidence for the posterior to evidence for the prior distribution of each parameter. We can use these values as a measure of the strength of evidence for each parameter's posterior being different than the prior. Because our prior distributions were centered around zero, we can consider them roughly like "null hypotheses." Thus a BF = 1 means our data didn't change our belief about the "null" prior at all, BF > 1 would mean we have stronger evidence for the posterior, and BF < 1 means we believe *more* in our original null prior after seeing the data.
 
 ```{r}
 bayesfactor_parameters(fit_extravrandomslope)
@@ -670,7 +670,7 @@ The function `conditional_effects()` plots posterior estimates of the fixed effe
 conditional_effects(fit_extravrandomslope)
 ```
 
-We can make more customized plots of the fixed effects, with more than one credible interval, if we generate estimated marginal means and trends (posterior predictive distributions) using the **emmeans** package and plot them using the **tidybayes** package.
+We can make more customized plots of the fixed effects, with more than one credible interval, if we generate estimated marginal means and trends (posterior predictive distributions) using the [**emmeans**](https://cran.r-project.org/package=emmeans) package and plot them using the [**tidybayes**](http://mjskay.github.io/tidybayes/) package.
 
 ```{r}
 sex_emmeans <- emmeans(fit_extravrandomslope, ~ sex)

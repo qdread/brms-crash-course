@@ -82,6 +82,7 @@ A method of statistical inference that allows you to use information you already
 ## Bayes' Theorem
 
 $$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
 - How likely an event is to happen based on our prior knowledge about conditions related to that event
 - The *conditional* probability of an event *A* occurring, conditioned on the probability of another event *B* occurring
 
@@ -89,7 +90,9 @@ $$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
 
 $$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
 
-The **probability of A being true given that B is true** ($$P(A|B)$$) is equal to the **probability that B is true given that A is true** ($$P(B|A)$$) times the **ratio of probabilities that A and B are true** ($$\frac{P(A)}{P(B)}$$)
+The **probability of A being true given that B is true** ($P(A|B)$)  
+is equal to the **probability that B is true given that A is true** ($P(B|A)$)  
+times the **ratio of probabilities that A and B are true** ($\frac{P(A)}{P(B)}$)
 
 ---
 
@@ -448,6 +451,7 @@ variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
   
 ---
 
+- Fixed-effect part of model formula is `1 + sex + extrav`
 - No random slope (effect of sex and extraversion on popularity is the same in every class)
 - Still using default priors
 
@@ -524,4 +528,298 @@ summary(fit_fixedslopes_priors)
 
 ### Posterior predictive check
 
-- `pp_check()` is a useful diagnostic
+- `pp_check()` is a useful diagnostic for how well the model fits the data
+
+```{r}
+pp_check(fit_fixedslopes_priors)
+```
+
+- black line: density plot of observed data 
+- blue lines: density plot of predicted data from 10 random draws from the posterior distribution
+- Because these are simulated data, it looks very good in this case
+
+---
+
+### Plotting posterior estimates
+
+- `summary()` only gives us the median and 95% credible interval
+- We can work with the full uncertainty distribution (nothing special about 95%)
+- Functions from **tidybayes** used to make tables and plots
+- `gather_draws()` makes a data frame from the posterior samples of parameters that we choose
+
+```{r}
+posterior_slopes <- gather_draws(fit_fixedslopes_priors, b_sex, b_extrav)
+```
+
+---
+
+- `median_qi()` gives us median and quantiles of the parameters
+
+```{r}
+posterior_slopes %>%
+  median_qi(.width = c(.66, .95, .99))
+```
+
+---
+
+- Special extensions to **ggplot2** for plotting quantiles of posterior distribution
+- I also include a dotted line at zero for comparison
+
+```{r}
+ggplot(posterior_slopes, aes(y = .variable, x = .value)) +
+  stat_halfeye(.width = c(.8, .95)) +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = 1)
+```
+
+```{r}
+ggplot(posterior_slopes, aes(y = .variable, x = .value)) +
+  stat_interval() +
+  stat_summary(fun = median, geom = 'point', size = 2) +
+  scale_color_brewer(palette = 'Blues') +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = 1)
+```
+
+## Model with first-level and second-level predictors {.smaller}
+
+- Sex and extraversion vary by individual (first-level predictors)
+- Teacher experience `texp` is shared by all individuals in the same classroom (second-level predictor)
+- The same syntax is used
+- Fixed-effect part is now `1 + sex + extrav + texp`
+
+```{r}
+fit_fixed12 <- brm(popular ~ 1 + sex + extrav + texp + (1 | class),  
+                   data = popular2data, 
+                   prior = c(
+                     prior(normal(0, 5), class = b)
+                   ),
+                   chains = 4, iter = 2000, warmup = 1000,
+                   seed = 703, file = 'fit_fixed12')
+```
+
+---
+
+Look at trace plots, posterior predictive check, and model summary.
+
+- What do they show?
+
+## Interactions between fixed effects
+
+- You can add interaction terms separated by `:`
+- example: `1 + sex + extrav + texp + sex:extrav + extrav:texp`
+- Interactions can be within level (like `sex:extrav`) or between levels (like `extrav:texp`)
+
+## Model with random slopes {.smaller}
+
+- So far we've assumed any predictor's effect is the same in every class (only intercept varies, not slope)
+- Add *random slope* term to allow both intercept and slope to vary
+- Specify a random slope by adding the appropriate slope to the design side of the random effect specification
+  + random intercept only `(1 | class)`
+  + random intercept and random slope with respect to extraversion `(1 + extrav | class)`
+  + random intercept and random slope with respect to extraversion and sex `(1 + extrav + sex | class)`
+- Doesn't make sense to have a random slope for `texp` because all students in the same class have the same `texp`
+
+---
+
+```{r}
+fit_randomslopes <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav + sex | class),  
+                   data = popular2data, 
+                   prior = c(
+                     prior(normal(0, 5), class = b)
+                   ),
+                   chains = 4, iter = 2000, warmup = 1000,
+                   seed = 709, file = 'fit_randomslopes')
+```
+
+> Note: this model may take a minute or two to sample
+
+- Look at trace plots, `pp_check`, and model summary
+
+---
+
+- Standard deviation of random slopes for sex is very small
+- We can probably omit the random slope for sex from the model
+- To confirm, plot class-level slopes for sex (sum of fixed + random) with QI intervals
+
+```{r}
+sex_slopes <- spread_draws(fit_randomslopes, b_sexgirl, r_class[class,variable]) %>%
+  filter(variable == 'sexgirl') %>%
+  mutate(slope = b_sexgirl + r_class)
+
+sex_slopes %>% 
+  median_qi(slope, .width = c(.66, .90, .95)) %>%
+  ggplot(aes(y = class, x = slope, xmin = .lower, xmax = .upper)) +
+  geom_interval() +
+  geom_point(size = 2) +
+  scale_color_brewer(palette = 'Blues')
+```
+
+---
+
+- The class-level effects of sex are all very similar
+- Refit the model without the random slope for sex, only for extraversion
+
+```{r}
+fit_extravrandomslope <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav | class),  
+                             data = popular2data, 
+                             prior = c(
+                               prior(normal(0, 5), class = b)
+                             ),
+                             chains = 4, iter = 2000, warmup = 1000,
+                             seed = 206, file = 'fit_extravrandomslope')
+```
+
+## Comparing models with information criteria {.smaller}
+
+- Leave-one-out (LOO) cross-validation compares models
+- How well does a model fit to all data points but one predict the one remaining data point?
+- First use `add_criterion()` to compute the LOO criterion for each model
+- Then use `loo_compare()` to rank the models
+
+```{r}
+fit_interceptonly_moresamples <- add_criterion(fit_interceptonly_moresamples, 'loo')
+fit_fixedslopes_priors <- add_criterion(fit_fixedslopes_priors, 'loo')
+fit_fixed12 <- add_criterion(fit_fixed12, 'loo')
+fit_randomslopes <- add_criterion(fit_randomslopes, 'loo')
+fit_extravrandomslope <- add_criterion(fit_extravrandomslope, 'loo')
+```
+
+---
+
+```{r}
+loo_compare(fit_interceptonly_moresamples, fit_fixedslopes_priors, fit_fixed12, fit_randomslopes, fit_extravrandomslope)
+```
+
+- Models ranked by ELPD (expected log pointwise predictive density)
+- The best one always has 0 and the others are ranked relative to it
+- The random slope models do equally well, so we can prefer the simpler one
+- The random intercept models do quite a bit worse
+- The model with no fixed effects does very poorly
+
+## Assessing evidence with Bayes Factors
+
+- Bayesian analogue of a p-value
+- Ratio of evidence between two models: $\frac{P(model_1|data)}{P(model_2|data)}$
+- Ranges from 0 to infinity
+- BF = 1 means equal evidence, BF > 1 means more evidence for model 1
+- No "significance" threshold but BF > 10 is usually called strong evidence
+
+---
+
+### Bayes factors for each parameter {.smaller}
+
+- R package **bayestestR** lets us compute BF for each parameter
+- Ratio of evidence for posterior : evidence for prior
+- Our prior distributions were centered at 0 so they are like "null hypotheses"
+- BF = 1 means we did not change our belief about the parameter at all from the prior, after seeing the data
+- BF > 1 means we've changed our belief about the parameter after seeing the data
+- BF < 1 means we have even stronger evidence that the prior is true, after seeing the data
+
+---
+
+```{r}
+bayesfactor_parameters(fit_extravrandomslope)
+```
+
+- BF < 1 for the intercept
+- BF >> 1000 for all other fixed effects
+- **WARNING**: BFs are very sensitive to your choice of prior
+
+## Making prediction plots
+
+- To finish, here are some examples of plots you can make to visualize model output
+- Posterior expected values given different values of the predictors
+
+---
+
+- `conditional_effects()` is a quick way to plot all fixed effects with 95% credible intervals
+
+```{r}
+conditional_effects(fit_extravrandomslope)
+```
+
+---
+
+- Customized plots can be made with packages **emmeans** and **tidybayes**
+- `emmeans()` gives you the expected value at specific levels of fixed predictors
+
+```{r}
+sex_emmeans <- emmeans(fit_extravrandomslope, ~ sex)
+
+gather_emmeans_draws(sex_emmeans) %>%
+  ggplot(aes(x = .value, y = sex)) +
+  stat_interval(.width = c(.66, .95, .99)) +
+  stat_summary(fun = median, geom = 'point', size = 2) +
+  scale_color_brewer(palette = 'Greens') +
+  ggtitle('posterior expected value by sex', 'averaged across extraversion and teacher experience')
+```
+
+---
+
+- `add_epred_draws()` gives you the expected value at levels of categorical and continuous fixed effects
+- Trend of popularity versus extraversion for each sex, at average value of `texp`
+- Averages across class-level random effects
+
+```{r}
+expand_grid(texp = mean(popular2data$texp),
+            extrav = seq(1, 10, by = .5),
+            sex = c('boy', 'girl')) %>%
+  add_epred_draws(fit_extravrandomslope, re_formula = ~ 0) %>%
+  ggplot(aes(x = extrav, y = .epred, group = sex, color = sex)) +
+  stat_lineribbon(.width = c(.66, .95, .99)) +
+  scale_fill_grey() +
+  scale_color_manual(values = c(boy = 'blue', girl = 'pink')) +
+  labs(y = 'posterior expected value of popularity') +
+  ggtitle('posterior expected value by extraversion + sex', 'at average value of teacher experience')
+```
+
+---
+
+- We can include the class-level random effects as well if we want
+- This plot only shows 10 of the 100 classes
+
+```{r}
+expand_grid(texp = mean(popular2data$texp),
+            extrav = seq(1, 10, by = .5),
+            sex = c('boy', 'girl'),
+            class = 1:10) %>%
+  add_epred_draws(fit_extravrandomslope, re_formula = ~ (1 + extrav|class)) %>%
+  ggplot(aes(x = extrav, y = .epred, group = class, color = sex)) +
+  facet_wrap(~ sex) +
+  stat_lineribbon(.width = c(.95), alpha = 1/4) +
+  scale_color_manual(values = c(boy = 'blue', girl = 'pink')) +
+  labs(y = 'posterior expected value of popularity') +
+  ggtitle('class-level predictions of popularity vs. extraversion by sex', 'at average value of teacher experience')
+```
+
+## Conclusion
+
+What did we learn? Let's revisit the learning objectives!
+
+## Conceptual learning objectives
+
+You now understand...
+
+- The basics of Bayesian inference
+- Definition of prior, likelihood, and posterior 
+- How Markov Chain Monte Carlo works
+- What a credible interval is
+
+## Practical skills
+
+You now can...
+
+- Write **brms** code to fit a multilevel model with random intercepts and random slopes
+- Diagnose and deal with convergence problems
+- Interpret **brms** output
+- Compare models with LOO information criteria
+- Use Bayes factors to assess strength of evidence for effects
+- Make plots of model parameters and predictions with credible intervals 
+
+---
+
+Congratulations, you are now Bayesians!
+
+---
+
+- See text version of lesson for further reading and useful resources
+- Please send any feedback to `quentin.read@usda.gov`!
