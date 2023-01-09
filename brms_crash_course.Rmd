@@ -16,7 +16,6 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 TO DO:
 
 - write some exercises (not necessary for now)
-- clean up headings
 -->
 
 # Introduction
@@ -109,7 +108,7 @@ or, flipping the left and right sides around,
 
 That's pretty cool!
 
-## Example
+## A "real-life" example of Bayes' theorem
 
 Let's say we pick up a coin off the street. We have a very strong prior belief that the true probability of flipping heads on any given flip is 0.5. Let's say we flipped the coin 10 times and got 8 heads. We probably wouldn't change that belief very much based on that evidence. It simply isn't enough evidence to sway us off that belief. The likelihood of getting 8 heads, given that the true probability is 0.5, is still high enough that our posterior estimate of the probability is still around 0.5.
 
@@ -121,7 +120,7 @@ But let's say a shady character on the street corner approaches us, shows us a c
 
 In a classical, "frequentist" analysis, there is no formal way to incorporate prior information into a statistical model. In both cases, we have no choice but to say the point estimate of the true probability of heads is 0.8. 
 
-## Why is it so computationally intensive?
+## Why is Bayes so computationally intensive?
 
 The coin flip example was pretty easy &mdash; you can do it in your head! Why do we need such advanced computational tools to do Bayesian inference?
 
@@ -193,9 +192,14 @@ options(brms.backend = 'cmdstanr', mc.cores = 4)
 
 Read the data CSV to a data frame. It is hosted on the GitHub repository for this course.
 
-```{r}
+```{r, eval = FALSE}
 popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
 ```
+
+```{r, echo = FALSE}
+popular2data <- read_csv('data/popular2data.csv')
+```
+
 
 Examine the data. These are simulated (i.e., fake) data that could have come from a study exploring what characteristics predict popularity of a student.
 
@@ -577,12 +581,12 @@ Let's go ahead and try to include random slopes for both the first-level predict
 
 ```{r}
 fit_randomslopes <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav + sex | class),  
-                   data = popular2data, 
-                   prior = c(
-                     prior(normal(0, 5), class = b)
-                   ),
-                   chains = 4, iter = 2000, warmup = 1000,
-                   seed = 709, file = 'fit_randomslopes')
+                        data = popular2data, 
+                        prior = c(
+                          prior(normal(0, 5), class = b)
+                        ),
+                        chains = 4, iter = 2000, warmup = 1000,
+                        seed = 709, file = 'fit_randomslopes')
 ```
 
 Let's take a look at this fit.

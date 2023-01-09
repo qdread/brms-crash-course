@@ -622,12 +622,12 @@ Look at trace plots, posterior predictive check, and model summary.
 
 ```{r}
 fit_randomslopes <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav + sex | class),  
-                   data = popular2data, 
-                   prior = c(
-                     prior(normal(0, 5), class = b)
-                   ),
-                   chains = 4, iter = 2000, warmup = 1000,
-                   seed = 709, file = 'fit_randomslopes')
+                        data = popular2data, 
+                        prior = c(
+                          prior(normal(0, 5), class = b)
+                        ),
+                        chains = 4, iter = 2000, warmup = 1000,
+                        seed = 709, file = 'fit_randomslopes')
 ```
 
 > Note: this model may take a minute or two to sample
