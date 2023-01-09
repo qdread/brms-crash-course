@@ -395,3 +395,133 @@ summary(fit_interceptonly_moresamples)
 ```
 
 ## Credible intervals
+
+- What is the "95% CI" thing on the parameter summaries?
+- *credible interval*, not confidence interval
+- more direct interpretation than confidence interval:
+  + We are 95% sure the parameter's value is in the 95% credible interval
+- based on quantiles of the posterior distribution
+
+---
+
+### Calculating credible intervals
+
+Median and 90% quantile-based credible interval (QI) of the intercept
+
+```{r}
+post_samples <- as_draws_df(fit_interceptonly_moresamples)
+post_samples_intercept <- post_samples$b_Intercept
+
+median(post_samples_intercept)
+quantile(post_samples_intercept, c(0.05, 0.95))
+```
+
+> `as_draws_df()` gets all posterior samples for all parameters and puts them into a data frame
+
+---
+
+- Literally anything in a Bayesian model has a posterior distribution, so anything can have a credible interval!
+- In frequentist models, you have to do bootstrapping to get that kind of interval on most quantitities
+
+## Variance decomposition
+
+- Proportion of variation at different nested levels
+- Calculate the ratio of variance within classes to between classes
+- `variance_decomposition()` from **performance** package also gives us a credible interval on the variance ratio
+
+```{r}
+variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
+```
+
+---
+
+- Variance ratio is much greater than zero so there is a need for a multilevel model
+- But I would recommend using one anyway, if that's the way your study was designed
+
+## Mixed-effects model with first-level predictors
+
+- So far we have only calculated mean of popularity and random variation by class
+- But what factors influence popularity of individual students?
+- Add first-level predictors (that vary by student) as fixed effects
+  + sex
+  + extraversion
+  
+---
+
+- No random slope (effect of sex and extraversion on popularity is the same in every class)
+- Still using default priors
+
+```{r}
+fit_fixedslopes <- brm(popular ~ 1 + sex + extrav + (1 | class),  
+                       data = popular2data, 
+                       chains = 4, iter = 2000, warmup = 1000,
+                       seed = 1400, file = 'fit_fixedslopes')
+```
+
+> `seed` sets a random seed for reproducibility, and `file` creates a `.rds` file in the working directory so you can reload the model later without rerunning.
+
+---
+
+```{r}
+summary(fit_fixedslopes)
+```
+
+- Low Rhat (the model converged)
+- Posterior distribution mass for fixed effects is well above zero
+- `sigma` (SD of residuals) is smaller than before because we're explaining more variation
+
+## Modifying priors
+
+- `prior_summary()` shows what priors were used to fit the model
+
+```{r}
+prior_summary(fit_fixedslopes)
+```
+
+- t-distributions on intercept, random effect SD, and residual SD (`sigma`)
+- mean of intercept prior is the mean of the data
+- mean of the variance parameters is 0 but lower bound is 0 (half bell curves)
+
+---
+
+### Priors on fixed effect slopes
+
+- By default they are flat
+- Assigns equal prior probability to *any* possible value
+- 0 is as probable as 100000 which is as probable as -55555, etc.
+- Not very plausible
+- It is OK in this case because the model converged, but often it helps convergence to use priors that only allow "reasonable" values
+
+---
+
+### Refitting with reasonable fixed-effect priors
+
+- `normal(0, 5)` is a good choice
+- Mean of 0 means we think that positive effects are just as likely as negative
+- SD of 5 means we are still assigning pretty high probability to large effect sizes
+- Use `prior()` to assign a prior to each class of parameters
+
+```{r}
+fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1 | class),  
+                       data = popular2data, 
+                       prior = c(
+                         prior(normal(0, 5), class = b)
+                       ),
+                       chains = 4, iter = 2000, warmup = 1000,
+                       seed = 1450, file = 'fit_fixedslopes_priors')
+```
+
+---
+
+```{r}
+summary(fit_fixedslopes_priors)
+```
+
+- Basically no effect on the results or the performance of the HMC sampler
+- But it's something to be mindful of in the future!
+
+---
+
+### Posterior predictive check
+
+- `pp_check()` is a useful diagnostic
