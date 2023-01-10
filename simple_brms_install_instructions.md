@@ -6,6 +6,8 @@ I want to give props to Paul B&uuml;rkner, the developer of `brms`, and all the 
 
 # Installing brms, Stan, and CmdStanR
 
+*Note: these instructions are intended for Windows users with R 4.2 installed.*
+
 First you have to install the `brms` package and all its dependencies from CRAN:
 
 `install.packages('brms')`
@@ -23,7 +25,9 @@ library(cmdstanr)
 check_cmdstan_toolchain(fix = TRUE)
 ```
 
-Once the CmdStan toolchain is configured correctly, you can install Stan (or a version of it called CmdStan):
+You may get a message that Rtools is not installed on your computer. If you don't have Rtools installed, you will need to install it so that the brms models can compile. To install Rtools, go to the [Rtools installation page on CRAN](https://cran.r-project.org/bin/windows/Rtools/rtools42/rtools.html) and download the **Rtools42 installer** using the link (it's a very large file, several hundred MB). Run the installer, and restart RStudio when the installation is complete. Go back to the previous step, starting from `library(cmdstanr)`, to reload the CmdStanR package and check the toolchain.
+
+Once you have confirmed that the CmdStan toolchain is configured correctly, you can install Stan (or a version of it called CmdStan):
 
 `install_cmdstan()`
 
