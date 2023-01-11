@@ -5,3 +5,9 @@
 
 # Fitted brms model objects
 *.rds
+
+# html files from rendered RMD and QMD
+*.html
+
+# directory generated when rendering QMD
+*_files/
