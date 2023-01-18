@@ -1,0 +1,788 @@
+---
+title: "A crash course in Bayesian mixed models with brms"
+author: "Quentin D. Read"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+<!--
+TO DO:
+
+- write some exercises (not necessary for now)
+-->
+
+# Introduction
+
+What is this course? It is a crash course in **brms**: a brief and practical introduction to fitting Bayesian multilevel models in R and Stan using the [**brms**](https://paul-buerkner.github.io/brms/) package (**B**ayesian **R**egression **M**odels using **S**tan). Because this is intended as a practical skills course, I will only give a quick and surface-level description of Bayesian analysis and how it can be used for multilevel regression models.
+
+[Download the worksheet for this lesson here](https://quentinread.com/SEAStats/brms_crash_course/brms_crash_course_worksheet.R).
+
+## What should you know coming into this course?
+
+This course is designed for practicing researchers who have some experience with statistical analysis and coding in R.
+
+### Minimal prerequisites
+
+- You should have at least heard of a mixed model or multilevel model.
+- You should have at least tried to do stats and/or data science in R before.
+- You should have at least a vague knowledge of what Bayesian analysis and inference are.
+
+### Advanced prerequisites
+
+- If you have experience with the R package [**lme4**](https://cran.r-project.org/package=lme4), that's great because the syntax of **brms** is modeled after **lme4**.
+- If you have experience with the [**tidyverse**](https://www.tidyverse.org/) packages, including [**ggplot2**](https://ggplot2.tidyverse.org/), for manipulating and plotting data, that's also great because we will be using them in this course.
+
+If you don't know what those packages are, don't sweat it because you can just follow along by copying the code.
+
+## What will you learn from this course?
+
+### Conceptual learning objectives
+
+At the end of this course, you will understand ...
+
+- The very basics of Bayesian inference
+- What a prior, likelihood, and posterior are in the context of a Bayesian model
+- The very basics of how Markov Chain Monte Carlo works
+- What a credible interval is
+
+### Practical skills
+
+At the end of this course, you will be able to ...
+
+- Write the code to specify and sample a multilevel model with random intercepts and random slopes in **brms**
+- Generate plots and statistics to make sure your model converged, and know a few ways to deal with convergence problems
+- Interpret the summary output of a multilevel model in **brms**
+- Compare different models with leave-one-out information criteria
+- Use Bayes factors to assess strength of evidence for effects
+- Make plots of model parameters and predictions, with credible intervals to show uncertainty
+
+\newpage
+
+## What is Bayesian inference?
+
+![](https://upload.wikimedia.org/wikipedia/commons/d/d4/Thomas_Bayes.gif)  
+*This may or may not actually be a portrait of Thomas Bayes*
+
+In its simplest form, Bayesian inference is a method of statistical inference that allows you to use information you already know to assign a prior probability to a hypothesis, then update the probability of that hypothesis as you get more information. If that seems like common sense, it is! 
+
+It is a very powerful tool that has been applied across many fields of human endeavor. Today we are only going to look at its application in estimating the parameters of multilevel statistical models to analyze scientific data, but that's only one of the many things we can use Bayesian inference for. Bayesian methods are only growing in popularity, thanks in large part to the rapid growth of user-friendly, open-source, computationally powerful software -- like [**Stan**](https://mc-stan.org/) and its companion R package [**brms**](https://paul-buerkner.github.io/brms/) that we are going to learn about today!
+
+Bayesian inference is named after Reverend Thomas Bayes, an English clergyman, philosopher, and yes, statistician, who wrote a scholarly work on probability (published after his death in 1763). His essay included an algorithm to use evidence to find the distribution of the probability parameter of a binomial distribution ... using what we now call Bayes' Theorem! However, much of the foundations of Bayesian inference were really developed by Pierre-Simon Laplace independently of Bayes and at roughly the same time. Give credit where it's due!
+
+\newpage
+
+## Bayes' Theorem
+
+![](https://static.scientificamerican.com/blogs/cache/file/5687448D-1F52-4287-A13D53F37A35BE41_source.jpg)
+
+Bayes' Theorem is the basis of Bayesian inference. It is a rule that describes how likely an event is to happen (its probability), based on our prior knowledge about conditions related to that event. In other words, it describes the *conditional* probability of an event *A* occurring, conditioned on the probability of another event *B* occurring.
+
+The mathematical statement of Bayes' theorem is:
+
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+This means the **probability of A being true given that B is true** ($P(A|B)$) is equal to the **probability that B is true given that A is true** ($P(B|A)$) times the **ratio of probabilities that A and B are true** ($\frac{P(A)}{P(B)}$). 
+
+This may not make sense yet but some more concrete examples might help.
+
+## How Bayes' theorem relates to statistical inference
+
+Let's say $A$ is a statistical model. A statistical model is a hypothesis about the world. We want to know the probability that our hypothesis is true. We start out with some prior knowledge about the probability that our model $A$ is true. So $P(A)$ is called the **prior probability**. We go out there and get some data $B$ to test our hypothesis. We can calculate the probability of observing that data $B$, given that $A$ is true: $P(B|A)$. This is also known as the **likelihood** of the model $A$, in light of our observations $B$. We use this to update our estimate of the probability that $A$ is true. We now have $P(A|B)$, the probability our model, or hypothesis, is true, given the data we just observed. 
+
+Notice we ignored the denominator, $P(B)$, the probability that the data are true. This is called the **marginal probability**. We can usually ignore it in the context of statistical inference. That's because the best we can do is to compare the relative probability of different models, given the data. We can't really say (nor should we say) what the absolute probability of a model is. ("All models are wrong.") If we are comparing two models $A_1$ and $A_2$, both fit using the same data $B$, and we take the ratio $\frac{P(A_1|B)}{P(A_2|B)} = \frac{P(B|A_1)P(A_1)/P(B)}{P(B|A_2)P(A_2)/P(B)}$, the two $P(B)$s cancel out. Thus we don't really need to care about $P(B)$ in practice.
+
+So we can get rid of the denominator and write Bayes' theorem as
+
+$$P(model|data) \propto P(data|model)P(model)$$
+
+or
+
+$$posterior = likelihood \times prior$$
+
+or, flipping the left and right sides around,
+
+*what we believed before about the world (prior) &times; how much our new data changes our beliefs (likelihood) = what we believe now about the world (posterior)*
+
+That's pretty cool!
+
+## A "real-life" example of Bayes' theorem
+
+Let's say we pick up a coin off the street. We have a very strong prior belief that the true probability of flipping heads on any given flip is 0.5. Let's say we flipped the coin 10 times and got 8 heads. We probably wouldn't change that belief very much based on that evidence. It simply isn't enough evidence to sway us off that belief. The likelihood of getting 8 heads, given that the true probability is 0.5, is still high enough that our posterior estimate of the probability is still around 0.5.
+
+But let's say a shady character on the street corner approaches us, shows us a coin, and offers to flip the coin 10 times. He offers to pay us \$1 for every tails if we pay him \$1 for every heads. Most likely, before we even got any new evidence, we'd be likely to think that the true probability of heads is not exactly 0.5. Or at least we would have a more skeptical prior belief, and we would be willing to entertain the possibility that the true probability of heads might be higher than 0.5. So now if we observe 8 heads, we might update our estimate of the true probability of heads to something higher, maybe 0.7.
+
+![](https://i.ytimg.com/vi/A-L7KOjyDrE/maxresdefault.jpg)
+
+*Our shady character might've studied this YouTube video.*
+
+In a classical, "frequentist" analysis, there is no formal way to incorporate prior information into a statistical model. In both cases, we have no choice but to say the point estimate of the true probability of heads is 0.8. 
+
+## Why is Bayes so computationally intensive?
+
+The coin flip example was pretty easy &mdash; you can do it in your head! Why do we need such advanced computational tools to do Bayesian inference?
+
+The main reason that Bayesian statistics were not widely adopted initially is probably a practical one. It boils down to $P(data|model)$, the likelihood, which we need to calculate to estimate $P(model|data)$, the posterior. If our "model" is just a single parameter like the probability of a coin flip being heads, and our "data" is just a count of heads out of 10, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $P(model|data)$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
+
+If you remember even trying to do two-dimensional integration on paper from calculus class, imagine doing 100-dimensional integration or even more! There just isn't enough time in the universe to get a precise solution for an integral with that many dimensions. In the time of Thomas Bayes, and for hundreds of years after that, Bayesian statistics simply couldn't be applied to real-world problems because of this computational limitation.
+
+### Markov Chain Monte Carlo
+
+That's where Markov Chain Monte Carlo (MCMC), aided by super-fast modern microprocessors, comes in. What is MCMC? It's a class of algorithms for drawing samples from a probability distribution. The longer the algorithm runs, the closer it gets to the true distribution. I won't describe it in detail here but the best beginner-level description of MCMC I've ever read is in Richard McElreath's book [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). 
+
+Because fitting complicated Bayesian models requires you to characterize a very high-dimensional probability distribution (the posterior), most Bayesian inference uses MCMC (although there is an alternative way to [approximate Bayesian inference](https://en.wikipedia.org/wiki/Integrated_nested_Laplace_approximations)). Usually in practice you run multiple Markov chains for a prespecified number of samples, discard some samples from the beginning of the chains when they were still searching for the correct solution, and retaining only the samples that you think characterize the true posterior distribution.
+
+## What is Stan?
+
+![](https://mc-stan.org/images/stan_logo.png)
+
+MCMC is a class of algorithms &mdash; there's more than one way to do it. In 1987, some physicists proposed a new MCMC algorithm called Hamiltonian Monte Carlo (HMC) to do calculations in quantum physics. I won't describe HMC here, except to say that it really works! Older MCMC algorithms are not nearly as efficient as HMC. HMC can converge on a solution ten times faster, if not more, than other algorithms. It makes Bayesian inference so much more practical. (Here's [an animation of HMC in action](https://raw.githubusercontent.com/chi-feng/mcmc-demo/master/docs/hmc.gif) exploring a probability distribution.) Recently, [Andrew Gelman](andrewgelman.com) and colleagues developed [Stan](mc-stan.org), which is a software platform for Bayesian statistical modeling using HMC. The models we will fit with **brms** in this lesson use Stan for back-end computation.
+
+Because HMC is now the state of the art for estimating high-dimensional integrals for Bayesian inference, it is not only implemented in Stan. It is also implemented in SAS [PROC BGLIMM](https://documentation.sas.com/doc/en/statug/15.2/statug_bglimm_details12.htm) and [MATLAB](https://www.mathworks.com/help/stats/hamiltoniansampler-class.html), among other stats packages, because it is just so damn good.
+
+\newpage
+
+## What is brms?
+
+![](https://raw.githubusercontent.com/paul-buerkner/brms/master/man/figures/brms.png)
+
+One hurdle for getting more people to use Stan is that you have to write quite a lot of code to specify a model in Stan. There are a lot of "tricks" that Stan users have developed to optimize their models and make them run faster. It can be hard to figure out how to implement all those tricks in the context of your statistical model. Luckily, a statistician named Paul B&uuml;rkner developed an R package called [**brms**](https://paul-buerkner.github.io/brms/). **brms** lets you set up regression models in R with very simple syntax. Behind the scenes, it translates your R code into Stan code, complete with all the tricks of scaling parameters, putting sensible prior distributions on parameters, and then runs the Stan model for you. 
+
+Out of the thousands of R packages out there, **brms** is far and away my favorite. Paul is extremely dedicated to his work. He has been very responsive to any issues I've raised and has added new features to **brms** at my request. Danke, Paul!
+
+We are going to use **brms** to fit Bayesian linear mixed models today.
+
+## Why use Bayes?
+
+After all that, you might be asking yourself, if it's so hard to do Bayesian inference, why bother? Maximum likelihood frequentist methods work really well! Well, they do, up to a point. There are some kinds of multilevel model that frequentist methods have a lot of trouble estimating the parameters for. Sometimes the maximum likelihood algorithms fail to find a solution. So even if you aren't completely convinced by the philosophical reasons to use Bayesian inference, it can be very practical from a computational standpoint. You can estimate models with Bayesian methods that simply can't be estimated any other way.
+
+Philosophically, there is another big advantage to Bayesian inference. Classical statistical methods are all based around rejecting a null hypothesis. This is very reductionist because it reduces real-world questions about how strong an effect is to a black-and-white yes-or-no answer. In Bayesian inference, we use the posterior distribution to say what we believe the size of the effect is. Bayesian inference lets us directly say "the probability that the effect is between X and Y is 95%" while in a frequentist analysis you have to say "if we ran the experiment again many times, our estimate of the parameter would be between X and Y 95% of the time." 
+
+I think I have gone on long enough talking about why to use Bayesian inference. Let's try to do some Bayesian modeling ourselves with **brms** to show how this powerful method works in practice!
+
+\newpage
+
+# Setup
+
+You should have already installed the R packages **brms** and [**cmdstanr**](https://mc-stan.org/cmdstanr/), and used **cmdstanr** to install CmdStan on your personal computer. We will also be using the [**tidyverse**](tidyverse.org), [**emmeans**](https://cran.r-project.org/package=emmeans), [**tidybayes**](http://mjskay.github.io/tidybayes/), and [**easystats**](https://easystats.github.io/easystats/) packages today.
+
+```{r load packages}
+library(brms)
+library(tidyverse)
+library(emmeans)
+library(tidybayes)
+library(easystats)
+```
+
+Set a plotting theme.
+
+```{r ggplot theme}
+theme_set(theme_minimal())
+```
+
+Set **brms** options. The option `brms.backend = 'cmdstanr'` means we want to use CmdStanR as a backend to run the **brms** models, instead of the default backend. If you were unable to install CmdStan correctly, omit the `brms.backend = 'cmdstanr'` part. The option `mc.cores = 4` means we will use four processor cores in parallel to fit the models, meaning we can allow four Markov chains to sample simultaneously.
+
+```{r}
+options(brms.backend = 'cmdstanr', mc.cores = 4)
+```
+
+## The data
+
+Read the data CSV to a data frame. It is hosted on the GitHub repository for this course.
+
+```{r, eval = FALSE}
+popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
+```
+
+```{r, echo = FALSE}
+popular2data <- read_csv('data/popular2data.csv')
+```
+
+
+Examine the data. These are simulated (i.e., fake) data that could have come from a study exploring what characteristics predict popularity of a student.
+
+```{r}
+glimpse(popular2data)
+```
+
+There are quite a few columns but we only need to be concerned with a few:
+
+- `pupil`: a numeric ID for each individual (1-26). Note that the IDs are nested, meaning the same ID is reused from class to class. For example pupil 1 in class 1 is not the same person as pupil 1 in class 2.
+- `class`: a numeric ID for each class (1-100). 
+- `extrav`: a numerical score for extraversion, or how outgoing each individual is (1-10).
+- `sex`: a binary variable (0 = boy, 1 = girl).
+- `texp`: a numerical score for teacher experience level (2-25). This value is the same for all pupils in the same class (they share a teacher)
+- `popular`: a continuous score (0-10) of the popularity of each individual student. This is the outcome variable we are interested in explaining. 
+
+In studies of this kind, the popularity score is obtained by having each student in the class rate all other students on their popularity, then averaging the score each student received. Therefore we might expect there to be a strong effect of class on the mean popularity rating, as well as the relationship between extraversion and popularity. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
+
+Here we say that pupil is *nested* within class because an individual pupil only occurs in one class. We say that extraversion and sex are *first-level* predictors because they are different for every pupil. We say that teacher experience is a *second-level* predictor because it is the same for all pupils in the same second-level group (class).
+
+For clarity, let's convert `sex` to a factor with labels.
+
+```{r}
+popular2data <- mutate(popular2data, sex = factor(sex, labels = c('boy', 'girl')))
+```
+
+\newpage
+
+# Exploratory plots
+
+Let's take a look at the relationship between extraversion and popularity. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because extraversion only has integer values.
+
+```{r}
+(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrav, y = popular)) +
+  geom_point(size = 1.2,
+             alpha = .8,
+             position = position_jitter(width = .2, height = 0)) +
+  ggtitle('Popularity vs. extraversion'))
+```
+
+Right now, this completely ignores the multilevel structure of the dataset. The popularity scores of pupils from the same class are not independent of one another. So far, ignoring that wrinkle, we can use the eyeball test to see that there is a moderately strong positive relationship between popularity and extraversion.
+
+We can add a regression trendline to the plot. This is a simple least squares linear regression line that ignores the nestedness of pupils within classes. Plotting simplified models in this way is fine to guide the eye for exploratory purposes.
+
+```{r}
+pop_vs_ext +
+  geom_smooth(method = lm, se = FALSE) +
+  ggtitle('Popularity vs. extraversion', subtitle = 'overall trendline')
+```
+
+This further supports our intuition that more outgoing students tend to be more popular.
+
+Now let's start to take the nested structure of the data into account. Color the points in the scatterplot based on which class (from 1 to 100) each pupil is in.
+
+```{r}
+(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrav, y = popular, color = class, group = class)) +
+   geom_point(size = 1.2,
+              alpha = .8,
+              position = position_jitter(width = .2, height = 0)) +
+   theme(legend.position = 'none') +
+   scale_color_distiller(palette = 'Set1') +
+   ggtitle('Popularity vs. extraversion', 'points colored by class'))
+```
+
+It's hard to visually separate the classes, because there are 100 of them and they largely overlap. Let's add different regression lines for each class. This is equivalent to fitting a separate linear model to each class. 
+
+```{r}
+pop_vs_ext_colored + 
+  geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
+  ggtitle('Popularity vs. extraversion', 'trendline by class')
+```
+
+You can see that the relationship between popularity and extraversion varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between classes.
+
+Here is a final exploratory plot that highlights the classes with the most extreme trends. The trendlines classes with the three highest slopes are plotted in blue, and the three lowest slopes in red. (This requires writing some code to pre-calculate the slopes and then modifying the plotting code to change the colors of the lines with the most extreme slopes).
+
+```{r}
+popular2data %>%
+  group_by(class) %>%
+  mutate(slope = lm(popular ~ extrav)$coefficients[2]) %>%
+  ungroup %>%
+  mutate(high_or_low = case_when(
+    slope >= sort(unique(slope))[98] ~ 'high',
+    slope <= sort(unique(slope))[3] ~ 'low',
+    TRUE ~ 'mid'
+  )) %>%
+  ggplot(aes(x = extrav, y = popular, group = class)) +
+  geom_point(size = 1.2,
+              alpha = .8,
+              position = position_jitter(width = .2, height = 0)) +
+  geom_smooth(aes(color = high_or_low, size = high_or_low), 
+              method = lm, se = FALSE) +
+  theme(legend.position = 'none') +
+  scale_color_manual(values = c(high = 'blue', low = 'red', mid = 'gray50')) +
+  scale_size_manual(values = c(high = 1.2, low = 1.2, mid = 0.6)) +
+  ggtitle('Popularity vs. extraversion', 'highlighting 6 classes with most extreme relationship')
+```
+
+\newpage
+
+# Fitting models
+
+## Intercept-only model
+
+If you have ever fit a mixed model using **lme4**, this will look familiar to you:
+
+```{r, eval = FALSE}
+lmer(popular ~ 1 + (1 | class), data = popular2data)
+```
+
+That is the syntax for fitting a mixed-effects model:
+
+- The dependent or response variable (`popular`) is on the left side of the formula.
+- A tilde `~` separates the dependent from the independent variables. 
+- Here the only fixed effect is the global intercept (`1`) and there is a random intercept fit to each class. 
+- The random effects specification (`(1 | class)`) has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`. 
+- In this case, the `1` on the design side means only fit random intercepts and no random slopes.
+- The `class` on the group side means each class will get its own random intercept.
+
+**brms** allows you to fit a Bayesian multilevel model with very similar syntax to the frequentist **lme4**. But instead of just getting maximum likelihood point estimates of the model parameters (the fixed and random effects), we're going to get posterior distributions for all of them! Get hyped!!! 
+
+But to do this we need to give a few extra directions to the Hamiltonian Monte Carlo sampling algorithm:
+
+- How many chains should run?
+- How many iterations should each chain run in total?
+- How many iterations should be used for the initial warmup phase (these are not included in the final posterior distribution)?
+- What are the initial values for the parameters?
+
+If we don't specify any of these, **brms** will use default values for number of chains and iterations, and it will assign random values for the initial values. 
+
+You may notice I have made no mention of priors yet. Another great thing about **brms** is that if you do not specify priors, it will assign uninformative priors that are at least plausible for each of the parameters. (For example, if the parameter is a variance parameter that must be positive, it will assign a prior distribution that is truncated at zero). This can be a major time saver but it can also be a dangerous thing. We will revisit priors later. For now we will skip specifying the priors and use the defaults.
+
+### Fitting our first model
+
+Without further ado, here is our first Bayesian multilevel model!
+
+Notice we have specified the model formula, the data, and the number of chains (2). Each chain will run for 200 total iterations, of which the first 100 are warmup when the sampler will be determining the optimal "jump" size to make at each iteration. We will get 200 - 100 = 100 draws from the posterior distribution for each chain. Finally, we let the initial values for the parameters all be random between -2 and 2 (default).
+
+```{r}
+fit_interceptonly <- brm(popular ~ 1 + (1 | class),
+                         data = popular2data,
+                         chains = 2,
+                         iter = 200,
+                         warmup = 100,
+                         init = 'random')
+```
+
+The model takes a minute or two to compile the C++ code but only two or three seconds to sample.
+
+Use the `summary()` function to see the output.
+
+```{r}
+summary(fit_interceptonly)
+```
+
+### Diagnosing convergence problems
+
+We get a warning about convergence. This is because I purposefully set the chains to run for a very small number of warmup and post-warmup sampling iterations. 
+
+The `Rhat` values for some of the parameters are > 1.05. What does this mean? `Rhat` is a statistic used to roughly indicate when multiple MCMC chains have converged on the same distribution. As chains approach convergence, the R-hat statistic approaches 1. It is ideal for all R-hat values for a model to be < 1.01, but at a bare minimum we need to have all R-hat values < 1.05.
+
+We can also `plot()` the model object to get density plots and trace plots of the posterior distribution (the 100 post warmup samples for each Markov chain)
+
+```{r}
+plot(fit_interceptonly)
+```
+
+What does this show? We see diagnostics for the three most important parameters of the model: 
+
+- the fixed effect intercept (`b_Intercept`). All fixed effect parameters in `brm` models begin with `b`, short for `beta`.
+- the standard deviation of the random class intercepts (`sd_class__Intercept`)
+- the standard deviation of the model's residuals (`sigma`)
+
+On the left are density plots for the posterior distributions of the parameters (made from the 200 posterior samples, 100 from each of the 2 chains).
+
+On the right are trace plots for the 100 post-warmup posterior samples for each of the chains separately. The HMC algorithm is so good that even with purely default priors and only a very small number of samples, we actually get pretty close to convergence. That would never be possible with older algorithms, which would have required thousands of samples. But they aren't quite converged. We still see that there are some trends in the trace plots where sometimes a chain is exploring one part of parameter space and sometimes another. This is a sign of failure to converge. The more complicated your models get, the more you will see this. 
+
+### Dealing with convergence problems
+
+What do we do about this? We can take the advice of the warning and either increase the number of iterations or set different priors. For now, let's increase the number of iterations to 1000 warmup and 1000 sampling (2000 total). We will get a total of 2000 posterior samples.
+
+We can use the `update()` method to draw more samples from the posterior distribution without having to recompile the model code.
+
+> Note: from now on I will not show the output of the **brms** progress indicator in this tutorial, but you will continue to see it in your R console as you run the code.
+
+```{r, results = 'hide'}
+fit_interceptonly_moresamples <- update(fit_interceptonly, chains = 2, iter = 2000, warmup = 1000)
+```
+
+Now let's look at the convergence diagnostic plots.
+
+```{r}
+plot(fit_interceptonly_moresamples)
+```
+
+The posterior distributions' density plots look like very smooth curves instead of the lumpy ones we saw in the previous plot (this is good) and the trace plots look like "hairy caterpillars" -- successive samples just move back and forth around a central tendency, with no trends over time. There is nearly complete overlap between chain 1 and chain 2 -- the chains are "mixing" well and so we can say from eyeballing it that we have converged on the solution.
+
+Let's call `summary()` again to look at the convergence diagnostic `Rhat` as well as some information about the parameters.
+
+```{r}
+summary(fit_interceptonly_moresamples)
+```
+
+We see low numbers for `Rhat`. Looking at the parameter values, we can see the fixed-effect or "population-level" intercept is about 5, with a 95% credible interval ranging from 4.9 to 5.25. We can also see the standard deviation for the "group-level" or random class intercepts `sd(Intercept)` and for the pupils within classes (the standard deviation of the overall model residuals `sigma`).
+
+## Credible intervals
+
+But what is this "credible interval" thing? Doesn't CI stand for confidence interval? You might be asking yourself this. Well, the posterior distribution for each parameter is a bunch of samples. We can calculate quantiles from this distribution. For example, we are 90% confident that the true value of the overall mean of popularity across all classes is somewhere between the 5th and 95th percentile of the posterior distribution of that value. This is much more straightforward than the interpretation of a confidence interval from a frequentist model. But unfortunately someone chose "credible interval" for its name which has the same initials as "confidence interval." In this lesson we will use quantile-based credible intervals (though there are other kinds) which you sometimes see called QI for quantile interval.
+
+We can pull out all 2000 samples from the posterior distribution of the intercept and calculate or plot any credible interval we want. The function `as_draws_df()` gets all draws from the posterior distribution for each parameter in a model and puts them into columns of a data frame.
+
+For example here is the median and the 90% quantile credible interval for the intercept.
+
+```{r}
+post_samples <- as_draws_df(fit_interceptonly_moresamples)
+post_samples_intercept <- post_samples$b_Intercept
+
+median(post_samples_intercept)
+quantile(post_samples_intercept, c(0.05, 0.95))
+```
+
+A useful thing about Bayesian models is that you can get a posterior distribution, and any credible interval you want, for any component of the model: parameter estimates, predicted values, etc. This is much harder to do in a frequentist model. We will see some of that later on in the model &mdash; and we will see some really cool ways to visualize the information contained in posterior distributions, including credible intervals.
+
+## Variance decomposition
+
+It is a good idea to examine the proportions of variance at different levels in your nested dataset. In this case we can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the [**performance**](https://easystats.github.io/performance/) package (part of [**easystats**](https://easystats.github.io/easystats/)), which also gives us a credible interval. We'll use 99%.
+
+```{r}
+variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
+```
+
+This shows that the variance ratio is much greater than zero meaning there's a strong need for a multilevel model in this case. Actually, if you have a dataset with a grouped structure, I would recommend still using a multilevel model even if the variance decomposition does not necessarily say it's warranted. It's better to stick with the model that your study design calls for.
+
+## Mixed-effects model with first level predictors 
+
+The intercept-only model is a good start. But so far all we've done is pull out the random variation in mean popularity by class. We want to make inference about what factors influence popularity of individual students. To do this, we can add some fixed effect predictors (slopes) to the model.
+
+We'll start with the first-level predictors that vary by student. We will add a fixed effect for sex and for extraversion. Because these slopes are fixed and not random, that means we are assuming that the effects of sex and extraversion on popularity are the same in each class. Also, note we still haven't specified our own priors, so **brms** is defaulting to very wide and uninformative priors.
+
+```{r}
+fit_fixedslopes <- brm(popular ~ 1 + sex + extrav + (1 | class),  
+                       data = popular2data, 
+                       chains = 4, iter = 2000, warmup = 1000,
+                       seed = 1400, file = 'fit_fixedslopes')
+```
+
+Notice the `seed` and `file` arguments. 
+
+- The `seed` argument (you can use any integer you want) sets the random seed so that we can reproduce the exact behavior of the MCMC chains again in case we need to refit the model. This is very important for reproducibility!
+- The `file` argument means a file called `fit_fixedslopes.rds` is created in your current working directory. This means that you can reload the fitted model object in a future R session without having to compile and sample the model again. If you run the same `brm` code again, it will look for the file and load it instead of refitting the model. This can save a lot of time if you have a model that takes hours or days to sample!
+
+`summary()` shows low R-hat statistics and also shows that most of the mass of the posterior distribution for the slopes is well above zero. This indicates a strong positive effect of sex (because boy = 0 and girl = 1 this means girls are more popular than boys on average) and a strong positive effect of extraversion (more outgoing students are more popular). We have roughly the same random effect variance parameter as before, but now `sigma` (the standard deviation of the residuals for individual pupils) is a lot lower than before. This makes sense because we have some effects in the model that explain some of the variance and result in lower residuals.
+
+```{r}
+summary(fit_fixedslopes)
+```
+
+\newpage
+
+## Modifying priors
+
+Here let's also inspect what default priors **brms** chose for us, and show how to modify them to see if there was any effect on the results. `prior_summary()` shows us the priors used in fitting a model.
+
+```{r}
+prior_summary(fit_fixedslopes)
+```
+
+This shows us that t-distributions were used for the priors on the intercept, the random effect SD, and the residual SD `sigma`. The mean of the t-distribution used as the prior on the intercept is 5.1 (this was gotten by just calculating the mean of the popularity values) which makes sense. The mean of the variance parameters is 0 but the lower bound `lb` is also 0. This means we have something like "half bell curves" for the variance parameters. The standard deviation of all the t-distribution priors is 2.5. These are sensible defaults and rarely need to be modified.
+
+What about the priors on the fixed effect slopes? They are flat priors. This means we are assigning exactly the same prior probability to any possible value the slope could take. Yes, that's an uninformative prior, but in practice it doesn't make sense to do this. Take the prior on sex for example. We are saying we assume that the prior probability that girls and boys have 0 difference in popularity is equal to the prior probability that girls have 10000 more units of popularity than boys, or -12345 units less, and so on. This makes no sense (especially because popularity can only range between 0 and 10)! Luckily, we have a simple model and lots of data so the model converges on a reasonable solution even with this flat prior. But if you have a more complex model, it is often a bad idea to let **brms** use these weak flat default priors. So even if you philosophically don't want to put your thumb on the scale, it's a good idea for practical reasons to specify at least a weak prior.
+
+Let's refit the model with reasonable priors on the fixed effect slopes. A normal distribution with mean 0 and a modest standard deviation, say 5, is a good choice. I like to think of it as a "null hypothesis" because it has equally as much prior probability for positive coefficients as negative. Also it allows for the possibility of extremely large effect sizes: in this context a slope of +5 or -5 would mean a change of one unit in the predictor being associated with a change of 5 units in the response. So we are being very agnostic and not assuming anything much about the effect. But it usually is beneficial for model convergence because there is very little chance the sampler will waste time trying out ridiculous values like 10000. We use the `prior` argument to `brm` and specify a vector of objects created with the `prior()` function. `class = b` means apply the same prior to all fixed effect slope parameters.
+
+```{r}
+fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1 | class),  
+                       data = popular2data, 
+                       prior = c(
+                         prior(normal(0, 5), class = b)
+                       ),
+                       chains = 4, iter = 2000, warmup = 1000,
+                       seed = 1450, file = 'fit_fixedslopes_priors')
+```
+
+```{r}
+summary(fit_fixedslopes_priors)
+```
+
+In this case as we discussed, the prior has little to no influence on the result because of the large amount of data. But it's a good idea to be mindful of what you are doing and not blindly use default priors all the time.
+
+## Posterior predictive check
+
+Whenever you fit a model, another good diagnostic to look at is the *posterior predictive check*. Use `pp_check()` to automatically generate a plot.
+
+```{r}
+pp_check(fit_fixedslopes_priors)
+```
+
+This plot shows a density plot of the observed data (black line) and density plots for the fitted values of the model for (by default) 10 random samples from the posterior distribution of the parameters (thin blue lines). Because these are simulated data, the observed data are very close to a perfect Gaussian bell curve. The posterior predictive lines closely match the observed data, meaning the model is a good fit to the data.
+
+## Plotting posterior estimates
+
+Now let's look a bit closer at the posterior distributions of the fixed effect slope parameters. `summary()` only gives us a point estimate and the upper and lower bounds of the 95% quantile-based credible interval. That's a good start but we might want to explore the posterior distribution in more detail. After all, Bayesian inference gives us a fully characterized uncertainty distribution. We have 4000 posterior samples for each parameter. Let's use some functions from the [**tidybayes**](http://mjskay.github.io/tidybayes/) package to make tables and plots of the slope parameters.
+
+First we use `gather_draws()` to pull out the posterior samples for some variables of our choosing and make a "tidy" data frame out of them.
+
+```{r}
+posterior_slopes <- gather_draws(fit_fixedslopes_priors, b_sex, b_extrav)
+
+posterior_slopes
+```
+
+The result is 8000 rows (4000 posterior samples for each of two slope parameters) and has columns indicating which chain and which iteration each sample comes from. Because the chains are all converged and mixed, we can ignore which chain each sample comes from and pool them all together.
+
+We can calculate summary statistics (quantiles) for each of the parameters with `median_qi()`. By default it gives 95% intervals but we can specify any width(s).
+
+```{r}
+posterior_slopes %>%
+  median_qi(.width = c(.66, .95, .99))
+```
+
+We can also use some special **ggplot2** extensions to make different kinds of plots that illustrate the shape of the posterior and the credible intervals. Here are two ways of doing it. On both plots I've included a dashed line at zero to highlight that all the probability mass is much greater than zero for both effects.
+
+```{r}
+ggplot(posterior_slopes, aes(y = .variable, x = .value)) +
+  stat_halfeye(.width = c(.8, .95)) +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = 1)
+```
+
+```{r}
+ggplot(posterior_slopes, aes(y = .variable, x = .value)) +
+  stat_interval() +
+  stat_summary(fun = median, geom = 'point', size = 2) +
+  scale_color_brewer(palette = 'Blues') +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = 1)
+```
+
+Because these posteriors are so symmetrical and resemble normal distributions, the credible intervals are a good way of describing the distribution and it isn't really necessary to show the density plots. But for many skewed posteriors, it is often helpful to illustrate the shape of the distribution.
+
+We will show more examples of how to summarize and visualize predictions later on.
+
+## Mixed-effects model with first and second level predictors
+
+Sex and extraversion are first-level predictors: they vary by individual student, even those that share the same class. A second-level predictor is one that is shared by all pupils in a class. In this dataset, the `texp` (teacher experience) variable is a second-level predictor because all pupils in the same "homeroom" class have the same teacher. 
+
+It does not require any different syntax to add a second-level predictor to the model. It is put in the model formula in exactly the same way as the first-level predictors. Here is another model with `texp` added as an additional fixed effect slope.
+
+```{r}
+fit_fixed12 <- brm(popular ~ 1 + sex + extrav + texp + (1 | class),  
+                   data = popular2data, 
+                   prior = c(
+                     prior(normal(0, 5), class = b)
+                   ),
+                   chains = 4, iter = 2000, warmup = 1000,
+                   seed = 703, file = 'fit_fixed12')
+```
+
+> Note: I am not going to include `plot(fit)` or `pp_check(fit)` explicitly in this tutorial anymore in the interest of space. But you should always generate those diagnostics for any model you fit as a matter of routine.
+
+Look at the summary for this fit:
+
+```{r}
+summary(fit_fixed12)
+```
+
+We have strong evidence for a positive effect of teacher experience on the average popularity of pupils at the classroom level. 
+
+## Interactions between fixed effects
+
+We can also add any interaction terms we would like if we want to test whether any of the fixed effects interact. For example, is the effect of extraversion on popularity stronger for girls or boys? That would be an interaction between the two first-level terms `sex` and `extrav`. Or is the effect of extraversion on popularity stronger in classrooms with more experienced teachers? That would be a cross-level interaction between the first-level predictor `extrav` and the second-level predictor `texp`. 
+
+Regardless of what level the predictors are, you can specify the interaction between fixed effects `a` and `b` by adding `a:b` to the fixed-effect part of the model formula. For example, if you want to model the main effects of sex, extraversion, and teacher experience, and add an interaction between extraversion and teacher experience, the model formula would include `1 + sex + extrav + texp + extrav:texp`.
+
+I will leave the interaction model for you to fit as an exercise.
+
+## Mixed-effects model with random slopes
+
+So far, we have assumed that any effect of the predictor variables is constant across all the classes. We've allowed the intercept for popularity to be different from class to class, but not the slope with respect to a predictor variable. We can add *random slopes* terms to the model to allow not only the intercept, but also the slope, of the popularity-extraversion relationship to vary by class. 
+
+To specify random slopes, we modify the *design* side of the random-effect term. For our random intercept model, we used `(1|class)`. To fit a random slope for each class with respect to extraversion, we would use `(1 + extrav|class)`. To fit a random slope for both extraversion and sex, we would use `(1 + extrav + sex|class)`.
+
+Let's go ahead and try to include random slopes for both the first-level predictors, `sex` and `extrav`. Note that it doesn't make sense to have a random slope for `texp` with respect to class, because `texp` is the same for all individuals in a class. We can't estimate a slope of teacher experience versus popularity within an individual class.
+
+> Note: this model may take a little longer to sample than the previous ones (~2 minutes on my laptop).
+
+```{r}
+fit_randomslopes <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav + sex | class),  
+                        data = popular2data, 
+                        prior = c(
+                          prior(normal(0, 5), class = b)
+                        ),
+                        chains = 4, iter = 2000, warmup = 1000,
+                        seed = 709, file = 'fit_randomslopes')
+```
+
+Let's take a look at this fit.
+
+```{r}
+summary(fit_randomslopes)
+```
+
+You can see from the summary that the standard deviation of the random slope for sex is very small (point estimate of 0.06, lower bound of 95% credible interval less than 0.01). Given that the fixed component of the slope for sex is estimated to be about 1.25, we can probably omit the random slope for sex from the model without losing much explanatory power.
+
+To confirm this, plot the posterior credible intervals of the class-level slopes for sex (sum of fixed and random components). The black dots are the medians.
+
+```{r}
+sex_slopes <- spread_draws(fit_randomslopes, b_sexgirl, r_class[class,variable]) %>%
+  filter(variable == 'sexgirl') %>%
+  mutate(slope = b_sexgirl + r_class)
+
+sex_slopes %>% 
+  median_qi(slope, .width = c(.66, .90, .95)) %>%
+  ggplot(aes(y = class, x = slope, xmin = .lower, xmax = .upper)) +
+  geom_interval() +
+  geom_point(size = 2) +
+  scale_color_brewer(palette = 'Blues')
+```
+
+This plot is not really possible to make in a frequentist analysis (unless you tried some fancy bootstrapping techniques) but it is easy as pie in a Bayesian context. As you can see from the plot, although we allowed the relationship between sex and popularity to vary from class to class, the model found that the class-level error was very low. All the slopes are between 1.2 and 1.3. Therefore we can refit the model without the random slope for sex (but retaining the one for extraversion).
+
+```{r}
+fit_extravrandomslope <- brm(popular ~ 1 + sex + extrav + texp + (1 + extrav | class),  
+                             data = popular2data, 
+                             prior = c(
+                               prior(normal(0, 5), class = b)
+                             ),
+                             chains = 4, iter = 2000, warmup = 1000,
+                             seed = 206, file = 'fit_extravrandomslope')
+
+summary(fit_extravrandomslope)
+```
+
+\newpage
+
+# Comparing models and assessing evidence
+
+## Comparing models with information criteria
+
+The models with different specifications for fixed and random effects have different numbers of parameters. We have used the `pp_check()` plot to "eyeball" how well the models fit the data. We can also use leave-one-out (LOO) cross-validation to produce an information criterion for any of the models we've fit so far, and then compare them. In **brms** this is a two-step process. First use `add_criterion()` to compute an information criterion for each model, then use `loo_compare()` to rank a set of models by information criterion.
+
+Let's compare all the models we've fit: the intercept-only model, the model with fixed effects for the first-level predictors only, the model with all first-level and second-level fixed effects and random intercepts, the model with all fixed effects and random slopes with respect to sex and extraversion, and the model with all fixed effects and only the extraversion random slope.
+
+```{r}
+fit_interceptonly_moresamples <- add_criterion(fit_interceptonly_moresamples, 'loo')
+fit_fixedslopes_priors <- add_criterion(fit_fixedslopes_priors, 'loo')
+fit_fixed12 <- add_criterion(fit_fixed12, 'loo')
+fit_randomslopes <- add_criterion(fit_randomslopes, 'loo')
+fit_extravrandomslope <- add_criterion(fit_extravrandomslope, 'loo')
+
+loo_compare(fit_interceptonly_moresamples, fit_fixedslopes_priors, fit_fixed12, fit_randomslopes, fit_extravrandomslope)
+```
+
+This output ranks the models from best fit to worst by ELPD, or expected log pointwise predictive density (a measure of how well the model fit to all but one data point from the original dataset predicts the new data point). The `elpd_diff` column is the difference between each other model and the one with the highest ELPD (thus the top row will always have `elpd_diff` of zero). The `se_diff` column is the standard error of that difference. 
+
+We see that the fit with only the extraversion random slope is ranked best in our comparison. The model with both random slopes has a difference of 0.3 ELPD from the best model, but the standard error of that difference is 0.7. This is basically a "tie" so we can safely go with the simpler of the two: `fit_extravrandomslope`. The models without any random slopes perform far worse (by about 40 log units), and the intercept-only model is a very bad fit (not surprisingly).
+
+## Assessing strength of evidence with Bayes factors
+
+"Credible intervals are great and all," you may be saying to yourself, "but what about a p-value? How am I supposed to know if x has an effect on y or not?" It's understandable to feel that way. The closest analogue to a p-value for a Bayesian model is the Bayes factor (BF). This is the ratio of evidence between two models (going back to Bayes' theorem, it's $\frac{P(model_1|data)}{P(model_2|data)}$. BFs can range from 0 to infinity. A BF of 1 means a 1:1 ratio (we have equal evidence for both models). As BF increases, we have more and more evidence for model 1.
+
+There's no universally agreed-upon "cutoff" for declaring "significance" of a BF. There are two different interpretation tables shown in the [Wikipedia article on Bayes factors](https://en.wikipedia.org/wiki/Bayes_factor). Roughly speaking, a BF of 10 or greater would indicate strong evidence.
+
+The R package [**bayestestR**](https://easystats.github.io/bayestestR/), also part of **easystats**, allows us to compute a BF for individual model parameters by calculating the ratio of evidence for the posterior to evidence for the prior distribution of each parameter. We can use these values as a measure of the strength of evidence for each parameter's posterior being different than the prior. Because our prior distributions were centered around zero, we can consider them roughly like "null hypotheses." Thus a BF = 1 means our data didn't change our belief about the "null" prior at all, BF > 1 would mean we have stronger evidence for the posterior, and BF < 1 means we believe *more* in our original null prior after seeing the data.
+
+```{r}
+bayesfactor_parameters(fit_extravrandomslope)
+```
+
+Here we see that BF < 1 for the intercept, which makes sense because we chose a prior that was just centered around the mean of the data. BF > 1000 for all the fixed effect slopes. This means we have very strong evidence for all three effects. This is also not surprising because we simulated the data in that way.
+
+> Warning: Bayes factors are very sensitive to your choice of prior. This is true even if your prior has little or no influence on the shape of the posterior. If you do decide to report BFs in a publication, be sure to carefully document how they were calculated.
+
+## Making prediction plots
+
+To finish up, let's make a few more plots visualizing the output of our fitted model. In all cases, we are going to plot the medians of posterior distributions of parameters or expected values as points, and quantile-based credible intervals to show uncertainty.
+
+The function `conditional_effects()` plots posterior estimates of the fixed effects, with 95% credible intervals by default. This is a nice way to quickly visualize the results.
+
+```{r}
+conditional_effects(fit_extravrandomslope)
+```
+
+We can make more customized plots of the fixed effects, with more than one credible interval, if we generate estimated marginal means and trends (posterior predictive distributions) using the [**emmeans**](https://cran.r-project.org/package=emmeans) package and plot them using the [**tidybayes**](http://mjskay.github.io/tidybayes/) package.
+
+```{r}
+sex_emmeans <- emmeans(fit_extravrandomslope, ~ sex)
+
+gather_emmeans_draws(sex_emmeans) %>%
+  ggplot(aes(x = .value, y = sex)) +
+  stat_interval(.width = c(.66, .95, .99)) +
+  stat_summary(fun = median, geom = 'point', size = 2) +
+  scale_color_brewer(palette = 'Greens') +
+  ggtitle('posterior expected value by sex', 'averaged across extraversion and teacher experience')
+```
+
+Or use the function `add_epred_draws()` to get posterior expected values at specified values of the fixed effects and plot them. For instance here's a plot of the model prediction for the trend of popularity versus extraversion for each sex, at the average value of teacher experience, and averaging across the random variation by class (population-level expectation).
+
+```{r}
+expand_grid(texp = mean(popular2data$texp),
+            extrav = seq(1, 10, by = .5),
+            sex = c('boy', 'girl')) %>%
+  add_epred_draws(fit_extravrandomslope, re_formula = ~ 0) %>%
+  ggplot(aes(x = extrav, y = .epred, group = sex, color = sex)) +
+  stat_lineribbon(.width = c(.66, .95, .99)) +
+  scale_fill_grey() +
+  scale_color_manual(values = c(boy = 'blue', girl = 'pink')) +
+  labs(y = 'posterior expected value of popularity') +
+  ggtitle('posterior expected value by extraversion + sex', 'at average value of teacher experience')
+```
+
+As you can see we had no interaction term for sex and extraversion in the model so the slopes are the same for both boys and girls, but girls have a higher intercept (more popular on average).
+
+The above plots ignore the effect of class (random slopes and intercepts) but we can also take that into account when generating the posterior expected values. THis plot shows the class effect for 10 of the classes (to make the plot less crowded).
+
+```{r}
+expand_grid(texp = mean(popular2data$texp),
+            extrav = seq(1, 10, by = .5),
+            sex = c('boy', 'girl'),
+            class = 1:10) %>%
+  add_epred_draws(fit_extravrandomslope, re_formula = ~ (1 + extrav|class)) %>%
+  ggplot(aes(x = extrav, y = .epred, group = class, color = sex)) +
+  facet_wrap(~ sex) +
+  stat_lineribbon(.width = c(.95), alpha = 1/4) +
+  scale_color_manual(values = c(boy = 'blue', girl = 'pink')) +
+  labs(y = 'posterior expected value of popularity') +
+  ggtitle('class-level predictions of popularity vs. extraversion by sex', 'at average value of teacher experience')
+```
+
+There are many other plots you could make of the model predictions. I will leave it as an exercise for you to explore them.
+
+\newpage
+
+# Conclusion
+
+What did we just learn? Let's take a look back at the learning objectives!
+
+### Conceptual learning objectives
+
+You now understand...
+
+- The basics of Bayesian inference
+- Definition of prior, likelihood, and posterior 
+- How Markov Chain Monte Carlo works
+- What a credible interval is
+
+### Practical skills
+
+You now can...
+
+- Write **brms** code to fit a multilevel model with random intercepts and random slopes
+- Diagnose and deal with convergence problems
+- Interpret **brms** output
+- Compare models with LOO information criteria
+- Use Bayes factors to assess strength of evidence for effects
+- Make plots of model parameters and predictions with credible intervals 
+
+That's an amazing set of skills!
+
+## Going further
+
+As I've already mentioned, this is not intended to be a replacement for a full Bayesian course. Richard McElreath has written an amazing Bayesian course called [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). It has a print book and ebook version, as well as a set of free video lectures. Solomon Kurz translated all the code examples in the book to **brms**, **ggplot2**, and **tidyverse** code: [Statistical Rethinking Recoded](https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/). Both are highly recommended.
+
+Here are some links to tutorials and lessons for learning basic Bayesian statistics with **brms**.
+
+- [Building a multilevel model in brms](https://www.rensvandeschoot.com/tutorials/brms-started/) by Rens van de Schoot
+- [An introduction to Bayesian multilevel models using brms](https://www.barelysignificant.com/phd_thesis/appendix-brms.html) by Ladislas Nalborczyk
+
+Here is a tutorial that goes through all the cool plots and tables you can make from a **brms** model with Matthew Kay's **tidybayes** package. I've shown a few of them in this lesson but there are many other visualizations available.
+
+- [Extracting and visualizing tidy draws from brms models](https://cran.r-project.org/web/packages/tidybayes/vignettes/tidy-brms.html)
+
+Paul Buerkner published two papers on **brms**:
+
+- [Buerkner 2017, Journal of Statistical Software](https://www.jstatsoft.org/article/view/v080i01)
+- [Buerkner 2018, The R Journal](https://journal.r-project.org/archive/2018/RJ-2018-017/index.html)
+
+There are also other ways to fit Bayesian mixed models in R.
+
+- [rstanarm](https://mc-stan.org/rstanarm/) is another R package that uses Stan behind the scenes, like **brms**.
+- [MCMCglmm](https://cran.r-project.org/web/packages/MCMCglmm/index.html) is another R package that fits Bayesian mixed models, but doesn't use Stan.
+
+You can use Stan without R as well, if that's your thing.
+
+- [PyStan](https://pystan.readthedocs.io/) is a Python interface to Stan
+- [CmdStan](https://mc-stan.org/users/interfaces/cmdstan) is a shell interface to Stan that lets you run Stan models directly from the command line (if you're a glutton for punishment).
