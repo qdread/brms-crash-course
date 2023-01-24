@@ -32,23 +32,26 @@ set.seed(1035)
 yield_data <- expand_grid(field = 1:20, plot = 1:20, variety = 0:1)
 
 # Generate the predictor variable data
-pred_vars <- rmvnorm(n=20, mean = c(25, 10), sigma = matrix(c(5, .2, .2, 1), 2))
+pred_vars <- rmvnorm(n=20, mean = c(20, 7), sigma = matrix(c(5, .2, .2, 1), 2))
 pred_dt <- cbind(tibble(field = 1:20), pred_vars) %>% set_names(c('field','rainfall','soilN_mean'))
 
 yield_data <- left_join(yield_data,pred_dt) %>%
   mutate(rainfall = round(rainfall),
-         soilN = round(rnorm(n=length(soilN_mean), mean = soilN_mean, sd = 2)),
+         soilN = ceiling(rnorm(n=length(soilN_mean), mean = soilN_mean, sd = 1.5)),
          variety = factor(variety),
          field = factor(field))
 
-fakelmer <- makeLmer(formula = yield ~ 1 + variety + soilN + rainfall + variety:soilN + soilN:rainfall + (1 + soilN | field), fixef = c(15, 2.25, 1.5, 1, 0, 0.5), VarCorr = vc,  sigma = .75, data = yield_data)
+# variance covariance matrix
+vc <- matrix(c(1.1, -.7, -.7, .5), 2)
+
+fakelmer <- makeLmer(formula = yield ~ 1 + variety + soilN + rainfall + variety:soilN + soilN:rainfall + (1 + soilN | field), fixef = c(15, 2.25, 1.5, 1, 0, 0.1), VarCorr = vc,  sigma = .3, data = yield_data)
 
 yield_data <- getData(fakelmer) %>%
   select(-soilN_mean) %>%
   group_by(field) %>%
   mutate(plot = 1:n()) %>%
   ungroup() %>%
-  mutate(yield=yield/40, soilN = soilN/2)
+  mutate(yield=yield/10, soilN = soilN/2)
 
 # Test brm models
 library(brms)
