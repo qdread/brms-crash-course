@@ -13,6 +13,7 @@ library(tidyverse)
 library(emmeans)
 library(tidybayes)
 library(easystats)
+library(logspline)
 
 theme_set(theme_minimal())
 
