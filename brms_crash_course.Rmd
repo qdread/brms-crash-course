@@ -243,49 +243,23 @@ This further supports our intuition that more soil nitrogen tends to promote hig
 Now let's start to take the nested structure of the data into account. Color the points in the scatterplot based on which field (from 1 to 25) each plot is in.
 
 ```{r}
-# FIXME THIS IS AS FAR AS I GOT
-(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrav, y = popular, color = class, group = class)) +
+(yield_vs_N_colored <- ggplot(data = yield_data, aes(x = soilN, y = yield, color = field, group = field)) +
    geom_point(size = 1.2,
               alpha = .8,
               position = position_jitter(width = .2, height = 0)) +
    theme(legend.position = 'none') +
-   scale_color_distiller(palette = 'Set1') +
-   ggtitle('Popularity vs. extraversion', 'points colored by class'))
+   ggtitle('Yield vs. soil N', 'points colored by field'))
 ```
 
 It's hard to visually separate the classes, because there are 100 of them and they largely overlap. Let's add different regression lines for each class. This is equivalent to fitting a separate linear model to each class. 
 
 ```{r}
-pop_vs_ext_colored + 
+yield_vs_N_colored + 
   geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
-  ggtitle('Popularity vs. extraversion', 'trendline by class')
+  ggtitle('Yield vs. soil N', 'trendline by class')
 ```
 
-You can see that the relationship between popularity and extraversion varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between classes.
-
-Here is a final exploratory plot that highlights the classes with the most extreme trends. The trendlines classes with the three highest slopes are plotted in blue, and the three lowest slopes in red. (This requires writing some code to pre-calculate the slopes and then modifying the plotting code to change the colors of the lines with the most extreme slopes).
-
-```{r}
-popular2data %>%
-  group_by(class) %>%
-  mutate(slope = lm(popular ~ extrav)$coefficients[2]) %>%
-  ungroup %>%
-  mutate(high_or_low = case_when(
-    slope >= sort(unique(slope))[98] ~ 'high',
-    slope <= sort(unique(slope))[3] ~ 'low',
-    TRUE ~ 'mid'
-  )) %>%
-  ggplot(aes(x = extrav, y = popular, group = class)) +
-  geom_point(size = 1.2,
-              alpha = .8,
-              position = position_jitter(width = .2, height = 0)) +
-  geom_smooth(aes(color = high_or_low, size = high_or_low), 
-              method = lm, se = FALSE) +
-  theme(legend.position = 'none') +
-  scale_color_manual(values = c(high = 'blue', low = 'red', mid = 'gray50')) +
-  scale_size_manual(values = c(high = 1.2, low = 1.2, mid = 0.6)) +
-  ggtitle('Popularity vs. extraversion', 'highlighting 6 classes with most extreme relationship')
-```
+You can see that the relationship between yield and soil nitrogen varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between fields.
 
 # Fitting models
 
@@ -294,17 +268,17 @@ popular2data %>%
 If you have ever fit a mixed model using **lme4**, this will look familiar to you:
 
 ```{r, eval = FALSE}
-lmer(popular ~ 1 + (1 | class), data = popular2data)
+lmer(yield ~ 1 + (1 | field), data = yield_data)
 ```
 
 That is the syntax for fitting a mixed-effects model:
 
-- The dependent or response variable (`popular`) is on the left side of the formula.
+- The dependent or response variable (`yield`) is on the left side of the formula.
 - A tilde `~` separates the dependent from the independent variables. 
-- Here the only fixed effect is the global intercept (`1`) and there is a random intercept fit to each class. 
-- The random effects specification (`(1 | class)`) has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`. 
+- Here the only fixed effect is the global intercept (`1`) and there is a random intercept fit to each field. 
+- The random effects specification (`(1 | field)`) has a *design* side (on the left hand) and *group* side (on the right hand) separated by `|`. 
 - In this case, the `1` on the design side means only fit random intercepts and no random slopes.
-- The `class` on the group side means each class will get its own random intercept.
+- The `field` on the group side means each field will get its own random intercept.
 
 **brms** allows you to fit a Bayesian multilevel model with very similar syntax to the frequentist **lme4**. But instead of just getting maximum likelihood point estimates of the model parameters (the fixed and random effects), we're going to get posterior distributions for all of them! Get hyped!!! 
 
@@ -326,8 +300,8 @@ Without further ado, here is our first Bayesian multilevel model!
 Notice we have specified the model formula, the data, and the number of chains (2). Each chain will run for 200 total iterations, of which the first 100 are warmup when the sampler will be determining the optimal "jump" size to make at each iteration. We will get 200 - 100 = 100 draws from the posterior distribution for each chain. Finally, we let the initial values for the parameters all be random between -2 and 2 (default).
 
 ```{r}
-fit_interceptonly <- brm(popular ~ 1 + (1 | class),
-                         data = popular2data,
+fit_interceptonly <- brm(yield ~ 1 + (1 | field),
+                         data = yield_data,
                          chains = 2,
                          iter = 200,
                          warmup = 100,
@@ -390,11 +364,11 @@ Let's call `summary()` again to look at the convergence diagnostic `Rhat` as wel
 summary(fit_interceptonly_moresamples)
 ```
 
-We see low numbers for `Rhat`. Looking at the parameter values, we can see the fixed-effect or "population-level" intercept is about 5, with a 95% credible interval ranging from 4.9 to 5.25. We can also see the standard deviation for the "group-level" or random class intercepts `sd(Intercept)` and for the pupils within classes (the standard deviation of the overall model residuals `sigma`).
+We see low numbers for `Rhat`. Looking at the parameter values, we can see the fixed-effect or "population-level" intercept is about 5.9, with a 95% credible interval ranging from 5.6 to 6.3. We can also see the standard deviation for the "group-level" or random field intercepts `sd(Intercept)` and for the plots within fields (the standard deviation of the overall model residuals `sigma`).
 
 ## Credible intervals
 
-But what is this "credible interval" thing? Doesn't CI stand for confidence interval? You might be asking yourself this. Well, the posterior distribution for each parameter is a bunch of samples. We can calculate quantiles from this distribution. For example, we are 90% confident that the true value of the overall mean of popularity across all classes is somewhere between the 5th and 95th percentile of the posterior distribution of that value. This is much more straightforward than the interpretation of a confidence interval from a frequentist model. But unfortunately someone chose "credible interval" for its name which has the same initials as "confidence interval." In this lesson we will use quantile-based credible intervals (though there are other kinds) which you sometimes see called QI for quantile interval.
+But what is this "credible interval" thing? Doesn't CI stand for confidence interval? You might be asking yourself this. Well, the posterior distribution for each parameter is a bunch of samples. We can calculate quantiles from this distribution. For example, we are 90% confident that the true value of the overall mean of yield across all fields is somewhere between the 5th and 95th percentile of the posterior distribution of that value. This is much more straightforward than the interpretation of a confidence interval from a frequentist model. But unfortunately someone chose "credible interval" for its name which has the same initials as "confidence interval." In this lesson we will use quantile-based credible intervals (though there are other kinds) which you sometimes see called QI for quantile interval.
 
 We can pull out all 2000 samples from the posterior distribution of the intercept and calculate or plot any credible interval we want. The function `as_draws_df()` gets all draws from the posterior distribution for each parameter in a model and puts them into columns of a data frame.
 
@@ -418,19 +392,19 @@ It is a good idea to examine the proportions of variance at different levels in 
 variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
 ```
 
-This shows that the variance ratio is much greater than zero meaning there's a strong need for a multilevel model in this case. Actually, if you have a dataset with a grouped structure, I would recommend still using a multilevel model even if the variance decomposition does not necessarily say it's warranted. It's better to stick with the model that your study design calls for.
+This shows that the proportion of variance within fields is much greater than zero meaning there's a strong need for a multilevel model in this case. Actually, if you have a dataset with a grouped structure, I would recommend still using a multilevel model even if the variance decomposition does not necessarily say it's warranted. It's better to stick with the model that your study design calls for.
 
 ## Mixed-effects model with first level predictors 
 
-The intercept-only model is a good start. But so far all we've done is pull out the random variation in mean popularity by class. We want to make inference about what factors influence popularity of individual students. To do this, we can add some fixed effect predictors (slopes) to the model.
+The intercept-only model is a good start. But so far all we've done is pull out the random variation in mean yield by field. We want to make inference about what factors influence yield at the individual plot level. To do this, we can add some fixed effect predictors (slopes) to the model.
 
-We'll start with the first-level predictors that vary by student. We will add a fixed effect for sex and for extraversion. Because these slopes are fixed and not random, that means we are assuming that the effects of sex and extraversion on popularity are the same in each class. Also, note we still haven't specified our own priors, so **brms** is defaulting to very wide and uninformative priors.
+We'll start with the first-level predictors that vary by plot. We will add a fixed effect for variety and for soil N. Because these slopes are fixed and not random, that means we are assuming that the effects of variety and soil N on yield are the same in each field. Also, note we still haven't specified our own priors, so **brms** is defaulting to very wide and uninformative priors.
 
 ```{r}
-fit_fixedslopes <- brm(popular ~ 1 + sex + extrav + (1 | class),  
-                       data = popular2data, 
+fit_fixedslopes <- brm(yield ~ 1 + variety + soilN + (1 | field),  
+                       data = yield_data, 
                        chains = 4, iter = 2000, warmup = 1000,
-                       seed = 1400, file = 'fit_fixedslopes')
+                       seed = 807, file = 'fit_fixedslopes')
 ```
 
 Notice the `seed` and `file` arguments. 
@@ -438,7 +412,7 @@ Notice the `seed` and `file` arguments.
 - The `seed` argument (you can use any integer you want) sets the random seed so that we can reproduce the exact behavior of the MCMC chains again in case we need to refit the model. This is very important for reproducibility!
 - The `file` argument means a file called `fit_fixedslopes.rds` is created in your current working directory. This means that you can reload the fitted model object in a future R session without having to compile and sample the model again. If you run the same `brm` code again, it will look for the file and load it instead of refitting the model. This can save a lot of time if you have a model that takes hours or days to sample!
 
-`summary()` shows low R-hat statistics and also shows that most of the mass of the posterior distribution for the slopes is well above zero. This indicates a strong positive effect of sex (because boy = 0 and girl = 1 this means girls are more popular than boys on average) and a strong positive effect of extraversion (more outgoing students are more popular). We have roughly the same random effect variance parameter as before, but now `sigma` (the standard deviation of the residuals for individual pupils) is a lot lower than before. This makes sense because we have some effects in the model that explain some of the variance and result in lower residuals.
+`summary()` shows low R-hat statistics and also shows that most of the mass of the posterior distribution for the slopes is well above zero. This indicates a strong positive effect of variety (the model codes short=0 and tall=1, meaning the tall variety has higher yield on average) and a strong positive effect of soil N on yield. We have roughly the same random effect variance parameter as before, but now `sigma` (the standard deviation of the residuals for individual plots) is a lot lower than before. This makes sense because we have some effects in the model that explain some of the variance and result in lower residuals.
 
 ```{r}
 summary(fit_fixedslopes)
@@ -452,20 +426,18 @@ Here let's also inspect what default priors **brms** chose for us, and show how 
 prior_summary(fit_fixedslopes)
 ```
 
-This shows us that t-distributions were used for the priors on the intercept, the random effect SD, and the residual SD `sigma`. The mean of the t-distribution used as the prior on the intercept is 5.1 (this was gotten by just calculating the mean of the popularity values) which makes sense. The mean of the variance parameters is 0 but the lower bound `lb` is also 0. This means we have something like "half bell curves" for the variance parameters. The standard deviation of all the t-distribution priors is 2.5. These are sensible defaults and rarely need to be modified.
+This shows us that t-distributions were used for the priors on the intercept, the random effect SD, and the residual SD `sigma`. The mean of the t-distribution used as the prior on the intercept is 5.9 (this was gotten by just calculating the mean of the yield values in the data) which makes sense. The mean of the variance parameters is 0 but the lower bound `lb` is also 0. This means we have something like "half bell curves" for the variance parameters. The standard deviation of all the t-distribution priors is 2.5. These are sensible defaults and rarely need to be modified.
 
-What about the priors on the fixed effect slopes? They are flat priors. This means we are assigning exactly the same prior probability to any possible value the slope could take. Yes, that's an uninformative prior, but in practice it doesn't make sense to do this. Take the prior on sex for example. We are saying we assume that the prior probability that girls and boys have 0 difference in popularity is equal to the prior probability that girls have 10000 more units of popularity than boys, or -12345 units less, and so on. This makes no sense (especially because popularity can only range between 0 and 10)! Luckily, we have a simple model and lots of data so the model converges on a reasonable solution even with this flat prior. But if you have a more complex model, it is often a bad idea to let **brms** use these weak flat default priors. So even if you philosophically don't want to put your thumb on the scale, it's a good idea for practical reasons to specify at least a weak prior.
+What about the priors on the fixed effect slopes? They are flat priors. This means we are assigning exactly the same prior probability to any possible value the slope could take. Yes, that's an uninformative prior, but in practice it doesn't make sense to do this. Take the prior on variety for example. We are saying we assume that the prior probability that the two varieties have 0 difference in yield is equal to the prior probability that the tall variety has 10000 more units of yield than the short, or -12345 units less, and so on. This makes no sense (especially because in our dataset yield only ranges between about 1 and 10)! Luckily, we have a simple model and lots of data so the model converges on a reasonable solution even with this flat prior. But if you have a more complex model, it is often a bad idea to let **brms** use these weak flat default priors. So even if you philosophically don't want to "put your thumb on the scale," it's a good idea for practical reasons to specify at least a weak prior.
 
 Let's refit the model with reasonable priors on the fixed effect slopes. A normal distribution with mean 0 and a modest standard deviation, say 5, is a good choice. I like to think of it as a "null hypothesis" because it has equally as much prior probability for positive coefficients as negative. Also it allows for the possibility of extremely large effect sizes: in this context a slope of +5 or -5 would mean a change of one unit in the predictor being associated with a change of 5 units in the response. So we are being very agnostic and not assuming anything much about the effect. But it usually is beneficial for model convergence because there is very little chance the sampler will waste time trying out ridiculous values like 10000. We use the `prior` argument to `brm` and specify a vector of objects created with the `prior()` function. `class = b` means apply the same prior to all fixed effect slope parameters.
 
 ```{r}
-fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1 | class),  
-                       data = popular2data, 
-                       prior = c(
-                         prior(normal(0, 5), class = b)
-                       ),
-                       chains = 4, iter = 2000, warmup = 1000,
-                       seed = 1450, file = 'fit_fixedslopes_priors')
+fit_fixedslopes_priors <- brm(yield ~ 1 + variety + soilN + (1 | field),
+            data = yield_data,
+            prior = c(prior(normal(0,5), class = b)),
+            chains = 4, iter = 2000, warmup = 1000,
+            seed = 811, file = 'fit_fixedslopes_priors')
 ```
 
 ```{r}
@@ -491,7 +463,7 @@ Now let's look a bit closer at the posterior distributions of the fixed effect s
 First we use `gather_draws()` to pull out the posterior samples for some variables of our choosing and make a "tidy" data frame out of them.
 
 ```{r}
-posterior_slopes <- gather_draws(fit_fixedslopes_priors, b_sex, b_extrav)
+posterior_slopes <- gather_draws(fit_fixedslopes_priors, b_varietytall, b_soilN)
 
 posterior_slopes
 ```
@@ -527,11 +499,12 @@ We will show more examples of how to summarize and visualize predictions later o
 
 ## Mixed-effects model with first and second level predictors
 
-Sex and extraversion are first-level predictors: they vary by individual student, even those that share the same class. A second-level predictor is one that is shared by all pupils in a class. In this dataset, the `texp` (teacher experience) variable is a second-level predictor because all pupils in the same "homeroom" class have the same teacher. 
+Variety and soil N are first-level predictors: they vary by individual plot, even those that share the same field. A second-level predictor is one that is shared by all plots in a field. In this dataset, the `rainfall` variable is a second-level predictor because all plots in the same field have the same rainfall value. This would happen if, for example, only one rain gauge is installed per field to measure rainfall. 
 
-It does not require any different syntax to add a second-level predictor to the model. It is put in the model formula in exactly the same way as the first-level predictors. Here is another model with `texp` added as an additional fixed effect slope.
+It does not require any different syntax to add a second-level predictor to the model. It is put in the model formula in exactly the same way as the first-level predictors. Here is another model with `rainfall` added as an additional fixed effect slope.
 
 ```{r}
+# FIXME THIS IS AS FAR AS I GOT
 fit_fixed12 <- brm(popular ~ 1 + sex + extrav + texp + (1 | class),  
                    data = popular2data, 
                    prior = c(
