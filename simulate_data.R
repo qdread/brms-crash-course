@@ -161,3 +161,13 @@ yield_data <- yield_data %>%
          variety = factor(variety, levels = 0:1, labels = c('standard', 'high-yield')))
 
 write_csv(yield_data,file = 'data/yield_data.csv')
+
+# edit again: we want to have alphabetical order already, as well as no hyphen in the factor name
+
+yield_data <- read_csv('data/yield_data.csv')
+
+yield_data <- yield_data %>%
+  mutate(yield = round(yield, 3),
+         variety = factor(variety, levels = c('standard', 'high-yield'), labels = c('short', 'tall')))
+
+write_csv(yield_data,file = 'data/yield_data.csv')

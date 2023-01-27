@@ -13,12 +13,6 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-<!--
-TO DO:
-
-- write some exercises (not necessary for now)
--->
-
 # Introduction
 
 What is this course? It is a crash course in **brms**: a brief and practical introduction to fitting Bayesian multilevel models in R and Stan using the [**brms**](https://paul-buerkner.github.io/brms/) package (**B**ayesian **R**egression **M**odels using **S**tan). Because this is intended as a practical skills course, I will only give a quick and surface-level description of Bayesian analysis and how it can be used for multilevel regression models.
@@ -195,67 +189,61 @@ options(brms.backend = 'cmdstanr', mc.cores = 4)
 Read the data CSV to a data frame. It is hosted on the GitHub repository for this course.
 
 ```{r, eval = FALSE}
-popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
+yield_data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/yield_data.csv')
 ```
 
 ```{r, echo = FALSE}
-popular2data <- read_csv('data/popular2data.csv')
+yield_data <- read_csv('data/yield_data.csv')
 ```
 
 
-Examine the data. These are simulated (i.e., fake) data that could have come from a study exploring what characteristics predict popularity of a student.
+Examine the data. These are simulated (i.e., fake) data that could have come from a study examining variations in crop yield between two varieties under different environmental conditions.
 
 ```{r}
-glimpse(popular2data)
+glimpse(yield_data)
 ```
 
-There are quite a few columns but we only need to be concerned with a few:
+Here is a description of the columns:
 
-- `pupil`: a numeric ID for each individual (1-26). Note that the IDs are nested, meaning the same ID is reused from class to class. For example pupil 1 in class 1 is not the same person as pupil 1 in class 2.
-- `class`: a numeric ID for each class (1-100). 
-- `extrav`: a numerical score for extraversion, or how outgoing each individual is (1-10).
-- `sex`: a binary variable (0 = boy, 1 = girl).
-- `texp`: a numerical score for teacher experience level (2-25). This value is the same for all pupils in the same class (they share a teacher)
-- `popular`: a continuous score (0-10) of the popularity of each individual student. This is the outcome variable we are interested in explaining. 
+- `field`: a text ID for each field where responses were measured (`'field1'` through `'field25'`).
+- `plot`: a text ID for each plot. Each field contains 40 plots labeled `'plot1'` through `'plot40'`. Note that the IDs are nested, meaning the same ID is reused from field to field. For example `'plot1'` in `'field1'` is not the same plot as `'plot1'` in `'field2'`, though they share a label.
+- `variety`: a text ID identifying one of two varieties in the study, `'short'` and `'tall'`.
+- `rainfall`: a numerical variable indicating how much rainfall each field received. All plots in the same field have the same rainfall variable.
+- `soilN`: a numerical variable indicating the level of soil nitrogen. Each plot has a unique value for this variable.
+- `yield`: a continuous variable indicating the yield at the plot level. This is the outcome variable we are interested in explaining. 
 
-In studies of this kind, the popularity score is obtained by having each student in the class rate all other students on their popularity, then averaging the score each student received. Therefore we might expect there to be a strong effect of class on the mean popularity rating, as well as the relationship between extraversion and popularity. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
+In a study like this, we might expect that the plot-level soil nitrogen has a positive correlation with yield, as well as the rainfall which varies at the field level. In addition, we might expect unmeasured variables at the field level to affect yield. Further, we might want to see whether there is a difference in the strength of the relationship between soil nitrogen and yield among the different fields. Thus this is an ideal situation for a multilevel model! (obviously, because we simulated this fake dataset to teach you about multilevel models...)
 
-Here we say that pupil is *nested* within class because an individual pupil only occurs in one class. We say that extraversion and sex are *first-level* predictors because they are different for every pupil. We say that teacher experience is a *second-level* predictor because it is the same for all pupils in the same second-level group (class).
-
-For clarity, let's convert `sex` to a factor with labels.
-
-```{r}
-popular2data <- mutate(popular2data, sex = factor(sex, labels = c('boy', 'girl')))
-```
-
+Here we say that plot is *nested* within field because an individual plot only occurs in one field. We say that soil nitrogen and variety are *first-level* predictors because they are different for every plot. We say that rainfall is a *second-level* predictor because it is the same for all plots in the same second-level group (field).
 
 # Exploratory plots
 
-Let's take a look at the relationship between extraversion and popularity. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because extraversion only has integer values.
+Let's take a look at the relationship between soil nitrogen and yield. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because soil nitrogen only has integer values.
 
 ```{r}
-(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrav, y = popular)) +
+(yield_vs_N <- ggplot(data = yield_data, aes(x = soilN, y = yield)) +
   geom_point(size = 1.2,
              alpha = .8,
              position = position_jitter(width = .2, height = 0)) +
-  ggtitle('Popularity vs. extraversion'))
+  ggtitle('Yield vs. soil N'))
 ```
 
-Right now, this completely ignores the multilevel structure of the dataset. The popularity scores of pupils from the same class are not independent of one another. So far, ignoring that wrinkle, we can use the eyeball test to see that there is a moderately strong positive relationship between popularity and extraversion.
+Right now, this completely ignores the multilevel structure of the dataset. The yield values of plots from the same field are not independent of one another. So far, ignoring that wrinkle, we can use the eyeball test to see that there is a moderately strong positive relationship between soil N and yield.
 
-We can add a regression trendline to the plot. This is a simple least squares linear regression line that ignores the nestedness of pupils within classes. Plotting simplified models in this way is fine to guide the eye for exploratory purposes.
+We can add a regression trendline to the plot. This is a simple least squares linear regression line that ignores the nestedness of plots within fields. Plotting simplified models in this way is fine to guide the eye for exploratory purposes.
 
 ```{r}
-pop_vs_ext +
+yield_vs_N +
   geom_smooth(method = lm, se = FALSE) +
-  ggtitle('Popularity vs. extraversion', subtitle = 'overall trendline')
+  ggtitle('Yield vs. soil N', subtitle = 'overall trendline')
 ```
 
-This further supports our intuition that more outgoing students tend to be more popular.
+This further supports our intuition that more soil nitrogen tends to promote higher yield.
 
-Now let's start to take the nested structure of the data into account. Color the points in the scatterplot based on which class (from 1 to 100) each pupil is in.
+Now let's start to take the nested structure of the data into account. Color the points in the scatterplot based on which field (from 1 to 25) each plot is in.
 
 ```{r}
+# FIXME THIS IS AS FAR AS I GOT
 (pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrav, y = popular, color = class, group = class)) +
    geom_point(size = 1.2,
               alpha = .8,
