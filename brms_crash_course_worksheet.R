@@ -13,65 +13,43 @@ library(tidyverse)
 library(emmeans)
 library(tidybayes)
 library(easystats)
+library(logspline)
 
 theme_set(theme_minimal())
 
 ...(brms.backend = 'cmdstanr', mc.cores = 4)
 
-popular2data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/popular2data.csv')
+yield_data <- read_csv('https://github.com/qdread/brms-crash-course/raw/main/data/yield_data.csv')
 
 glimpse(...)
 
-popular2data <- mutate(popular2data, ... = ...(sex, labels = c('boy', 'girl')))
-
 # Exploratory plots (full code provided)
 
-(pop_vs_ext <- ggplot(data = popular2data, aes(x = extrav, y = popular)) +
-  geom_point(size = 1.2,
-             alpha = .8,
-             position = position_jitter(width = .2, height = 0)) +
-  ggtitle('Popularity vs. extraversion'))
+(yield_vs_N <- ggplot(data = yield_data, aes(x = soilN, y = yield)) +
+    geom_point(size = 1.2,
+               alpha = .8,
+               position = position_jitter(width = .2, height = 0)) +
+    ggtitle('Yield vs. soil N'))
 
-pop_vs_ext +
+yield_vs_N +
   geom_smooth(method = lm, se = FALSE) +
-  ggtitle('Popularity vs. extraversion', subtitle = 'overall trendline')
+  ggtitle('Yield vs. soil N', subtitle = 'overall trendline')
 
-(pop_vs_ext_colored <- ggplot(data = popular2data, aes(x = extrav, y = popular, color = class, group = class)) +
-   geom_point(size = 1.2,
-              alpha = .8,
-              position = position_jitter(width = .2, height = 0)) +
-   theme(legend.position = 'none') +
-   scale_color_distiller(palette = 'Set1') +
-   ggtitle('Popularity vs. extraversion', 'points colored by class'))
+(yield_vs_N_colored <- ggplot(data = yield_data, aes(x = soilN, y = yield, color = field, group = field)) +
+    geom_point(size = 1.2,
+               alpha = .8,
+               position = position_jitter(width = .2, height = 0)) +
+    theme(legend.position = 'none') +
+    ggtitle('Yield vs. soil N', 'points colored by field'))
 
-pop_vs_ext_colored + 
+yield_vs_N_colored + 
   geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
-  ggtitle('Popularity vs. extraversion', 'trendline by class')
-
-popular2data %>%
-  group_by(class) %>%
-  mutate(slope = lm(popular ~ extrav)$coefficients[2]) %>%
-  ungroup %>%
-  mutate(high_or_low = case_when(
-    slope >= sort(unique(slope))[98] ~ 'high',
-    slope <= sort(unique(slope))[3] ~ 'low',
-    TRUE ~ 'mid'
-  )) %>%
-  ggplot(aes(x = extrav, y = popular, group = class)) +
-  geom_point(size = 1.2,
-              alpha = .8,
-              position = position_jitter(width = .2, height = 0)) +
-  geom_smooth(aes(color = high_or_low, size = high_or_low), 
-              method = lm, se = FALSE) +
-  theme(legend.position = 'none') +
-  scale_color_manual(values = c(high = 'blue', low = 'red', mid = 'gray50')) +
-  scale_size_manual(values = c(high = 1.2, low = 1.2, mid = 0.6)) +
-  ggtitle('Popularity vs. extraversion', 'highlighting 6 classes with most extreme relationship')
+  ggtitle('Yield vs. soil N', 'trendline by field')
 
 # Model with random intercepts only
 
-fit_interceptonly <- ...(popular ~ ... + ...,
-                         ... = popular2data,
+fit_interceptonly <- ...(yield ~ ... + ...,
+                         ... = yield_data,
                          chains = ...,
                          iter = ...,
                          warmup = ...,
@@ -95,28 +73,28 @@ variance_decomposition(..., ci = ...)
 
 # Model with random intercepts and fixed slopes
 
-fit_fixedslopes <- brm(... + (1 | class),  
-                       data = popular2data, 
+fit_fixedslopes <- brm(... + (1 | field),  
+                       data = yield_data, 
                        chains = 4, iter = 2000, warmup = 1000,
-                       ... = 1400, ... = 'fit_fixedslopes')
+                       ... = 807, ... = 'fit_fixedslopes')
 
 summary(fit_fixedslopes)
 prior_summary(...)
 
 # Same model with modified priors
 
-fit_fixedslopes_priors <- brm(popular ~ 1 + sex + extrav + (1 | class),  
-                       data = popular2data, 
-                       ... = c(
-                         ...(normal(...), class = ...)
-                       ),
-                       chains = 4, iter = 2000, warmup = 1000,
-                       seed = 1450, file = 'fit_fixedslopes_priors')
+fit_fixedslopes_priors <- brm(yield ~ 1 + variety + soilN + (1 | field),
+                              data = yield_data, 
+                              ... = c(
+                                ...(normal(...), class = ...)
+                              ),
+                              chains = 4, iter = 2000, warmup = 1000,
+                              seed = 811, file = 'fit_fixedslopes_priors')
 
 summary(fit_fixedslopes_priors)
 pp_check(...)
 
-posterior_slopes <- ...(fit_fixedslopes_priors, b_sex, ...)
+posterior_slopes <- ...(fit_fixedslopes_priors, b_varietytall, ...)
 
 posterior_slopes %>%
   ...(.width = c(.66, .95, .99))
@@ -134,8 +112,8 @@ ggplot(..., aes(y = .variable, x = .value)) +
 
 # Model with random intercepts and fixed slopes for both first-level and second-level predictors
 
-fit_fixed12 <- brm(popular ~ 1 + ... + (1 | class),  
-                   data = popular2data, 
+fit_fixed12 <- brm(yield ~ 1 + ... + (1 | field),  
+                   data = yield_data, 
                    prior = c(
                      prior(normal(0, 5), class = b)
                    ),
@@ -146,41 +124,40 @@ summary(fit_fixed12)
 
 # Model with random intercepts and random slopes for the first-level predictors
 
-fit_randomslopes <- brm(popular ~ ... + (... | ...),  
-                        data = popular2data, 
+fit_randomslopes <- brm(yield ~ ... + (... | ...),  
+                        data = yield_data, 
                         prior = c(
                           prior(normal(0, 5), class = b)
                         ),
                         chains = 4, iter = 2000, warmup = 1000,
-                        seed = 709, file = 'fit_randomslopes')
+                        seed = 777, file = 'fit_randomslopes')
 
 summary(fit_randomslopes)
 
-# Examine random slopes for sex at the class level
+# Examine random slopes for variety at the field level
 
-sex_slopes <- ...(fit_randomslopes, b_sexgirl, r_class[class,variable]) %>%
-  filter(variable == 'sexgirl') %>%
+variety_slopes <- ...(fit_randomslopes, b_varietytall, r_field[field,variable]) %>%
+  filter(variable == 'varietytall') %>%
   mutate(slope = ...)
 
-sex_slopes %>% 
+variety_slopes %>% 
   median_qi(slope, .width = c(.66, .90, .95)) %>%
-  ggplot(aes(y = class, x = slope, xmin = .lower, xmax = .upper)) +
+  ggplot(aes(y = field, x = slope, xmin = .lower, xmax = .upper)) +
   geom_interval() +
   geom_point(size = 2) +
   scale_color_brewer(palette = 'Blues')
 
+# Model with the random slope for variety removed and only the random slope for soil N remaining
 
-# Model with the random slope for sex removed and only the random slope for extraversion remaining
+fit_soilNrandomslope <- brm(yield ~ 1 + variety + soilN + rainfall + (... | field),  
+                            data = yield_data, 
+                            prior = c(
+                              prior(normal(0, 5), class = b)
+                            ),
+                            chains = 4, iter = 2000, warmup = 1000,
+                            seed = 888, file = 'fit_soilNrandomslope')
 
-fit_extravrandomslope <- brm(popular ~ 1 + sex + extrav + texp + (... | class),  
-                             data = popular2data, 
-                             prior = c(
-                               prior(normal(0, 5), class = b)
-                             ),
-                             chains = 4, iter = 2000, warmup = 1000,
-                             seed = 206, file = 'fit_extravrandomslope')
-
-summary(fit_extravrandomslope)
+summary(fit_soilNrandomslope)
 
 # Model comparison by leave-one-out cross-validation
 
@@ -188,49 +165,38 @@ fit_interceptonly_moresamples <- ...(fit_interceptonly_moresamples, ...)
 fit_fixedslopes_priors <- add_criterion(fit_fixedslopes_priors, 'loo')
 fit_fixed12 <- add_criterion(fit_fixed12, 'loo')
 fit_randomslopes <- add_criterion(fit_randomslopes, 'loo')
-fit_extravrandomslope <- add_criterion(fit_extravrandomslope, 'loo')
+fit_soilNrandomslope <- add_criterion(fit_soilNrandomslope, 'loo')
 
-...(fit_interceptonly_moresamples, fit_fixedslopes_priors, fit_fixed12, fit_randomslopes, fit_extravrandomslope)
+...(fit_interceptonly_moresamples, fit_fixedslopes_priors, fit_fixed12, fit_randomslopes, fit_soilNrandomslope)
 
 # Compute Bayes factor for each parameter in the final random slope model
 
-...(fit_extravrandomslope)
+...(fit_soilNrandomslope)
 
 # Make plots of model predictions
 
-...(fit_extravrandomslope)
+...(fit_soilNrandomslope)
 
 # Complete code is provided for the rest of the plots.
 
-sex_emmeans <- emmeans(fit_extravrandomslope, ~ sex)
+plot(conditional_effects(fit_soilNrandomslope, effects="soilN:field", re_formula = NULL), 
+     line_args=list(linewidth=1.2, alpha = 0.2), theme = theme(legend.position = 'none'))
 
-gather_emmeans_draws(sex_emmeans) %>%
-  ggplot(aes(x = .value, y = sex)) +
+variety_emmeans <- emmeans(fit_soilNrandomslope, ~ sex)
+
+gather_emmeans_draws(variety_emmeans) %>%
+  ggplot(aes(x = .value, y = variety)) +
   stat_interval(.width = c(.66, .95, .99)) +
   stat_summary(fun = median, geom = 'point', size = 2) +
   scale_color_brewer(palette = 'Greens') +
-  ggtitle('posterior expected value by sex', 'averaged across extraversion and teacher experience')
+  ggtitle('posterior expected value by variety', 'averaged across soil N and rainfall')
 
-expand_grid(texp = mean(popular2data$texp),
-            extrav = seq(1, 10, by = .5),
-            sex = c('boy', 'girl')) %>%
-  add_epred_draws(fit_extravrandomslope, re_formula = ~ 0) %>%
-  ggplot(aes(x = extrav, y = .epred, group = sex, color = sex)) +
+expand_grid(rainfall = mean(yield_data$rainfall),
+            soilN = seq(2, 9, by = .5),
+            variety = c('short', 'tall')) %>%
+  add_epred_draws(fit_soilNrandomslope, re_formula = ~ 0) %>%
+  ggplot(aes(x = soilN, y = .epred, group = variety, color = variety)) +
   stat_lineribbon(.width = c(.66, .95, .99)) +
   scale_fill_grey() +
-  scale_color_manual(values = c(boy = 'blue', girl = 'pink')) +
-  labs(y = 'posterior expected value of popularity') +
-  ggtitle('posterior expected value by extraversion + sex', 'at average value of teacher experience')
-
-expand_grid(texp = mean(popular2data$texp),
-            extrav = seq(1, 10, by = .5),
-            sex = c('boy', 'girl'),
-            class = 1:10) %>%
-  add_epred_draws(fit_extravrandomslope, re_formula = ~ (1 + extrav|class)) %>%
-  ggplot(aes(x = extrav, y = .epred, group = class, color = sex)) +
-  facet_wrap(~ sex) +
-  stat_lineribbon(.width = c(.95), alpha = 1/4) +
-  scale_color_manual(values = c(boy = 'blue', girl = 'pink')) +
-  labs(y = 'posterior expected value of popularity') +
-  ggtitle('class-level predictions of popularity vs. extraversion by sex', 'at average value of teacher experience')
-
+  labs(y = 'posterior expected value of yield') +
+  ggtitle('posterior expected value by soil N + variety', 'at average value of rainfall')
