@@ -134,7 +134,7 @@ Because fitting complicated Bayesian models requires you to characterize a very 
 
 ## What is Stan?
 
-![](https://mc-stan.org/images/stan_logo.png){width=50%}
+![](https://mc-stan.org/images/stan_logo.png){width=25%}
 
 MCMC is a class of algorithms &mdash; there's more than one way to do it. In 1987, some physicists proposed a new MCMC algorithm called Hamiltonian Monte Carlo (HMC) to do calculations in quantum physics. I won't describe HMC here, except to say that it really works! Older MCMC algorithms are not nearly as efficient as HMC. HMC can converge on a solution ten times faster, if not more, than other algorithms. It makes Bayesian inference so much more practical. Recently, [Andrew Gelman](andrewgelman.com) and colleagues developed [Stan](mc-stan.org), which is a software platform for Bayesian statistical modeling using HMC. The models we will fit with **brms** in this lesson use Stan for back-end computation.
 
