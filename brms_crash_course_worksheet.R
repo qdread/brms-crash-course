@@ -147,9 +147,9 @@ variety_slopes %>%
   geom_point(size = 2) +
   scale_color_brewer(palette = 'Blues')
 
-# Model with the random slope for sex removed and only the random slope for extraversion remaining
+# Model with the random slope for variety removed and only the random slope for soil N remaining
 
-fit_soilNrandomslope <- brm(yield ~ 1 + variety + soilN + rainfall + (... | class),  
+fit_soilNrandomslope <- brm(yield ~ 1 + variety + soilN + rainfall + (... | field),  
                             data = yield_data, 
                             prior = c(
                               prior(normal(0, 5), class = b)
@@ -179,6 +179,9 @@ fit_soilNrandomslope <- add_criterion(fit_soilNrandomslope, 'loo')
 
 # Complete code is provided for the rest of the plots.
 
+plot(conditional_effects(fit_soilNrandomslope, effects="soilN:field", re_formula = NULL), 
+     line_args=list(linewidth=1.2, alpha = 0.2), theme = theme(legend.position = 'none'))
+
 variety_emmeans <- emmeans(fit_soilNrandomslope, ~ sex)
 
 gather_emmeans_draws(variety_emmeans) %>%
@@ -197,15 +200,3 @@ expand_grid(rainfall = mean(yield_data$rainfall),
   scale_fill_grey() +
   labs(y = 'posterior expected value of yield') +
   ggtitle('posterior expected value by soil N + variety', 'at average value of rainfall')
-
-expand_grid(rainfall = mean(yield_data$rainfall),
-            soilN = seq(2, 9, by = .5),
-            variety = c('short', 'tall'),
-            field = paste0('field', 1:25)) %>%
-  add_epred_draws(fit_soilNrandomslope, re_formula = ~ (1 + soilN | field)) %>%
-  ggplot(aes(x = soilN, y = .epred, group = field, color = variety)) +
-  facet_wrap(~ variety) +
-  stat_lineribbon(.width = c(.95), alpha = 1/4) +
-  labs(y = 'posterior expected value of yield') +
-  ggtitle('field-level predictions of yield vs. soil N by variety', 'at average value of rainfall')
-

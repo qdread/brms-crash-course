@@ -119,7 +119,9 @@ In a classical, "frequentist" analysis, there is no formal way to incorporate pr
 
 The coin flip example was pretty easy &mdash; you can do it in your head! Why do we need such advanced computational tools to do Bayesian inference?
 
-The main reason that Bayesian statistics were not widely adopted initially is probably a practical one. It boils down to $P(data|model)$, the likelihood, which we need to calculate to estimate $P(model|data)$, the posterior. If our "model" is just a single parameter like the probability of a coin flip being heads, and our "data" is just a count of heads out of 10, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $P(model|data)$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
+The main reason that Bayesian statistics were not widely adopted initially is probably a practical one. It boils down to $P(data|model)$, the likelihood, which we need to calculate to estimate $P(model|data)$, the posterior. you may have heard of "maximum likelihood" methods. Maximum likelihood algorithms are used to fit frequentist models. They try to find the set of parameters that make the data the most probable. In the Bayesian world, we are still trying to do that, but instead of getting a single point estimate of the parameters that are most likely given the data, we are now trying to estimate a joint probability distribution over all possible combinations of values the parameters could take. We end up with a *distribution* for all the parameters that is most likely given the data we observed.
+
+If our "model" is just a single parameter like the probability of a coin flip being heads, and our "data" is just a count of heads out of 10, the calculations are trivial. But what if our model is a multilevel regression model with a bunch of fixed effects, a bunch of random intercepts at multiple levels, and variance-covariance parameters for all the errors (like we are about to fit in this very lesson)? We might have hundreds of parameters. To estimate $P(model|data)$, we have to integrate a probability density function across n-dimensional space, where n is the total number of parameters in the model! 
 
 If you remember even trying to do two-dimensional integration on paper from calculus class, imagine doing 100-dimensional integration or even more! There just isn't enough time in the universe to get a precise solution for an integral with that many dimensions. In the time of Thomas Bayes, and for hundreds of years after that, Bayesian statistics simply couldn't be applied to real-world problems because of this computational limitation.
 
@@ -640,6 +642,17 @@ The function `conditional_effects()` plots posterior estimates of the fixed effe
 conditional_effects(fit_soilNrandomslope)
 ```
 
+We can also incorporate the random effects into the prediction using `conditional_effects()`, as in this example of field-level fitted relationships between yield and soil N (with a few plotting options added to make the plot more readable):
+
+```{r}
+plot(conditional_effects(fit_soilNrandomslope, effects="soilN:field", re_formula = NULL), 
+     line_args=list(linewidth=1.2, alpha = 0.2), theme = theme(legend.position = 'none'))
+```
+
+If you compare this plot to the scatterplot we made earlier with a separate simple regression trendline fit to the yield versus soil N data from each field, you might notice the lines on this plot have slightly less extreme slopes. That illustrates what's called "shrinkage": the mixed model is adjusting for the overestimation of trends we would have if we fit separate models for each field. The slopes "shrink" toward the mean overall slope. Check out this [animated demo of shrinkage](https://m-clark.github.io/posts/2019-05-14-shrinkage-in-mixed-models/) for more details!
+
+### Custom plots
+
 We can make more customized plots of the fixed effects, with more than one credible interval, if we generate estimated marginal means and trends (posterior predictive distributions) using the [**emmeans**](https://cran.r-project.org/package=emmeans) package and plot them using the [**tidybayes**](http://mjskay.github.io/tidybayes/) package.
 
 ```{r}
@@ -668,21 +681,6 @@ expand_grid(rainfall = mean(yield_data$rainfall),
 ```
 
 As you can see we had no interaction term for variety and soil N in the model so the slopes are the same for both varieties, but the tall variety has a higher intercept (greater yield on average).
-
-The above plots ignore the effect of field (random slopes and intercepts) but we can also take that into account when generating the posterior expected values. 
-
-```{r}
-expand_grid(rainfall = mean(yield_data$rainfall),
-            soilN = seq(2, 9, by = .5),
-            variety = c('short', 'tall'),
-            field = paste0('field', 1:25)) %>%
-  add_epred_draws(fit_soilNrandomslope, re_formula = ~ (1 + soilN | field)) %>%
-  ggplot(aes(x = soilN, y = .epred, group = field, color = variety)) +
-  facet_wrap(~ variety) +
-  stat_lineribbon(.width = c(.95), alpha = 1/4) +
-  labs(y = 'posterior expected value of yield') +
-  ggtitle('field-level predictions of yield vs. soil N by variety', 'at average value of rainfall')
-```
 
 There are many other plots you could make of the model predictions. I will leave it as an exercise for you to explore them.
 
