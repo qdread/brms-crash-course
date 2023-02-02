@@ -58,9 +58,11 @@ At the end of this course, you will be able to ...
 - Use Bayes factors to assess strength of evidence for effects
 - Make plots of model parameters and predictions, with credible intervals to show uncertainty
 
+\newpage
+
 ## What is Bayesian inference?
 
-![](https://upload.wikimedia.org/wikipedia/commons/d/d4/Thomas_Bayes.gif)  
+![](https://qdread.github.io/SEAStats/images/Thomas_Bayes.png)  
 *This may or may not actually be a portrait of Thomas Bayes*
 
 In its simplest form, Bayesian inference is a method of statistical inference that allows you to use information you already know to assign a prior probability to a hypothesis, then update the probability of that hypothesis as you get more information. If that seems like common sense, it is! 
@@ -69,9 +71,11 @@ It is a very powerful tool that has been applied across many fields of human end
 
 Bayesian inference is named after Reverend Thomas Bayes, an English clergyman, philosopher, and yes, statistician, who wrote a scholarly work on probability (published after his death in 1763). His essay included an algorithm to use evidence to find the distribution of the probability parameter of a binomial distribution ... using what we now call Bayes' Theorem! However, much of the foundations of Bayesian inference were really developed by Pierre-Simon Laplace independently of Bayes and at roughly the same time. Give credit where it's due!
 
+\newpage
+
 ## Bayes' Theorem
 
-![](https://static.scientificamerican.com/blogs/cache/file/5687448D-1F52-4287-A13D53F37A35BE41_source.jpg)
+![](https://static.scientificamerican.com/blogs/cache/file/5687448D-1F52-4287-A13D53F37A35BE41_source.jpg){width=50%}
 
 Bayes' Theorem is the basis of Bayesian inference. It is a rule that describes how likely an event is to happen (its probability), based on our prior knowledge about conditions related to that event. In other words, it describes the *conditional* probability of an event *A* occurring, conditioned on the probability of another event *B* occurring.
 
@@ -109,7 +113,7 @@ Let's say we pick up a coin off the street. We have a very strong prior belief t
 
 But let's say a shady character on the street corner approaches us, shows us a coin, and offers to flip the coin 10 times. He offers to pay us \$1 for every tails if we pay him \$1 for every heads. Most likely, before we even got any new evidence, we'd be likely to think that the true probability of heads is not exactly 0.5. Or at least we would have a more skeptical prior belief, and we would be willing to entertain the possibility that the true probability of heads might be higher than 0.5. So now if we observe 8 heads, we might update our estimate of the true probability of heads to something higher, maybe 0.7.
 
-![](https://i.ytimg.com/vi/A-L7KOjyDrE/maxresdefault.jpg)
+![](https://i.ytimg.com/vi/A-L7KOjyDrE/maxresdefault.jpg){width=50%}
 
 *Our shady character might've studied this YouTube video.*
 
@@ -133,7 +137,7 @@ Because fitting complicated Bayesian models requires you to characterize a very 
 
 ## What is Stan?
 
-![](https://mc-stan.org/images/stan_logo.png)
+![](https://mc-stan.org/images/stan_logo.png){width=50%}
 
 MCMC is a class of algorithms &mdash; there's more than one way to do it. In 1987, some physicists proposed a new MCMC algorithm called Hamiltonian Monte Carlo (HMC) to do calculations in quantum physics. I won't describe HMC here, except to say that it really works! Older MCMC algorithms are not nearly as efficient as HMC. HMC can converge on a solution ten times faster, if not more, than other algorithms. It makes Bayesian inference so much more practical. Recently, [Andrew Gelman](andrewgelman.com) and colleagues developed [Stan](mc-stan.org), which is a software platform for Bayesian statistical modeling using HMC. The models we will fit with **brms** in this lesson use Stan for back-end computation.
 
@@ -142,6 +146,8 @@ MCMC is a class of algorithms &mdash; there's more than one way to do it. In 198
 *Animation of HMC in action exploring a probability distribution*
 
 Because HMC is now the state of the art for estimating high-dimensional integrals for Bayesian inference, it is not only implemented in Stan. It is also implemented in SAS [PROC BGLIMM](https://documentation.sas.com/doc/en/statug/15.2/statug_bglimm_details12.htm) and [MATLAB](https://www.mathworks.com/help/stats/hamiltoniansampler-class.html), among other stats packages, because it is just so damn good.
+
+\newpage
 
 ## What is brms?
 
@@ -160,6 +166,8 @@ After all that, you might be asking yourself, if it's so hard to do Bayesian inf
 Philosophically, there is another big advantage to Bayesian inference. Classical statistical methods are all based around rejecting a null hypothesis. This is very reductionist because it reduces real-world questions about how strong an effect is to a black-and-white yes-or-no answer. In Bayesian inference, we use the posterior distribution to say what we believe the size of the effect is. Bayesian inference lets us directly say "the probability that the effect is between X and Y is 95%" while in a frequentist analysis you have to say "if we ran the experiment again many times, our estimate of the parameter would be between X and Y 95% of the time." 
 
 I think I have gone on long enough talking about why to use Bayesian inference. Let's try to do some Bayesian modeling ourselves with **brms** to show how this powerful method works in practice!
+
+\newpage
 
 # Setup
 
@@ -218,6 +226,8 @@ In a study like this, we might expect that the plot-level soil nitrogen has a po
 
 Here we say that plot is *nested* within field because an individual plot only occurs in one field. We say that soil nitrogen and variety are *first-level* predictors because they are different for every plot. We say that rainfall is a *second-level* predictor because it is the same for all plots in the same second-level group (field).
 
+\newpage
+
 # Exploratory plots
 
 Let's take a look at the relationship between soil nitrogen and yield. (I won't explain the **ggplot2** code in this lesson.) In this plot, the points are jittered in the x direction for plotting purposes because soil nitrogen only has integer values.
@@ -262,6 +272,8 @@ yield_vs_N_colored +
 ```
 
 You can see that the relationship between yield and soil nitrogen varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between fields.
+
+\newpage
 
 # Fitting models
 
@@ -419,6 +431,8 @@ Notice the `seed` and `file` arguments.
 ```{r}
 summary(fit_fixedslopes)
 ```
+
+\newpage
 
 ## Modifying priors
 
@@ -594,6 +608,8 @@ fit_soilNrandomslope <- brm(yield ~ 1 + variety + soilN + rainfall + (1 + soilN 
 summary(fit_soilNrandomslope)
 ```
 
+\newpage
+
 # Comparing models and assessing evidence
 
 ## Comparing models with information criteria
@@ -683,6 +699,8 @@ expand_grid(rainfall = mean(yield_data$rainfall),
 As you can see we had no interaction term for variety and soil N in the model so the slopes are the same for both varieties, but the tall variety has a higher intercept (greater yield on average).
 
 There are many other plots you could make of the model predictions. I will leave it as an exercise for you to explore them.
+
+\newpage
 
 # Conclusion
 

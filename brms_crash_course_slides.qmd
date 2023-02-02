@@ -62,7 +62,7 @@ At the end of this course, you will be able to ...
 
 ## What is Bayesian inference?
 
-![](https://upload.wikimedia.org/wikipedia/commons/d/d4/Thomas_Bayes.gif)  
+![](https://qdread.github.io/SEAStats/images/Thomas_Bayes.png)  
 
 ## What is Bayesian inference?
 
