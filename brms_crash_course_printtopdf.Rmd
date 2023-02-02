@@ -260,7 +260,7 @@ Now let's start to take the nested structure of the data into account. Color the
    ggtitle('Yield vs. soil N', 'points colored by field'))
 ```
 
-It's hard to visually separate the classes, because there are 100 of them and they largely overlap. Let's add different regression lines for each class. This is equivalent to fitting a separate linear model to each class. 
+It's hard to visually separate the fields, because there are 25 of them and they largely overlap. Let's add different regression lines for each field. This is equivalent to fitting a separate linear model to each field. 
 
 ```{r}
 yield_vs_N_colored + 
@@ -268,7 +268,7 @@ yield_vs_N_colored +
   ggtitle('Yield vs. soil N', 'trendline by field')
 ```
 
-You can see that the relationship between yield and soil nitrogen varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between fields.
+You can see that the relationship between yield and soil nitrogen varies by field -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between fields.
 
 \newpage
 
@@ -342,7 +342,7 @@ plot(fit_interceptonly)
 What does this show? We see diagnostics for the three most important parameters of the model: 
 
 - the fixed effect intercept (`b_Intercept`). All fixed effect parameters in `brm` models begin with `b`, short for `beta`.
-- the standard deviation of the random class intercepts (`sd_class__Intercept`)
+- the standard deviation of the random field intercepts (`sd_field__Intercept`)
 - the standard deviation of the model's residuals (`sigma`)
 
 On the left are density plots for the posterior distributions of the parameters (made from the 200 posterior samples, 100 from each of the 2 chains).
@@ -397,7 +397,7 @@ A useful thing about Bayesian models is that you can get a posterior distributio
 
 ## Variance decomposition
 
-It is a good idea to examine the proportions of variance at different levels in your nested dataset. In this case we can calculate the ratio of variance within to between classes. This is made easy by the `variance_decomposition()` from the [**performance**](https://easystats.github.io/performance/) package (part of [**easystats**](https://easystats.github.io/easystats/)), which also gives us a credible interval. We'll use 99%.
+It is a good idea to examine the proportions of variance at different levels in your nested dataset. In this case we can calculate the ratio of variance within to between fields. This is made easy by the `variance_decomposition()` from the [**performance**](https://easystats.github.io/performance/) package (part of [**easystats**](https://easystats.github.io/easystats/)), which also gives us a credible interval. We'll use 99%.
 
 ```{r}
 variance_decomposition(fit_interceptonly_moresamples, ci = 0.99)
