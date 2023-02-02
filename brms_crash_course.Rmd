@@ -161,7 +161,7 @@ I think I have gone on long enough talking about why to use Bayesian inference. 
 
 # Setup
 
-You should have already installed the R packages **brms** and [**cmdstanr**](https://mc-stan.org/cmdstanr/), and used **cmdstanr** to install CmdStan on your personal computer. We will also be using the [**tidyverse**](tidyverse.org), [**emmeans**](https://cran.r-project.org/package=emmeans), [**tidybayes**](http://mjskay.github.io/tidybayes/), and [**easystats**](https://easystats.github.io/easystats/) packages today. Also note the [**logspline**](https://cran.r-project.org/package=logspline) package is necessary to have installed although we will not be calling any functions from it directly.
+You should have already installed the R packages **brms** and [**cmdstanr**](https://mc-stan.org/cmdstanr/), and used **cmdstanr** to install CmdStan on your personal computer. We will also be using the [**tidyverse**](tidyverse.org), [**emmeans**](https://cran.r-project.org/package=emmeans), [**tidybayes**](http://mjskay.github.io/tidybayes/), and [**easystats**](https://easystats.github.io/easystats/) packages today. Also note the [**logspline**](https://cran.r-project.org/package=logspline) package is necessary to have installed although we will not be calling any functions from it directly. Install all those packages if you haven't yet.
 
 ```{r load packages}
 library(brms)
@@ -256,7 +256,7 @@ It's hard to visually separate the classes, because there are 100 of them and th
 ```{r}
 yield_vs_N_colored + 
   geom_smooth(method = lm, se = FALSE, linewidth = 0.7, alpha = 0.8) +
-  ggtitle('Yield vs. soil N', 'trendline by class')
+  ggtitle('Yield vs. soil N', 'trendline by field')
 ```
 
 You can see that the relationship between yield and soil nitrogen varies by class -- but it's positive on average. A multilevel model helps us estimate the overall trend while taking into account the variation in trend (slope and intercept) between fields.
