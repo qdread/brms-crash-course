@@ -182,7 +182,7 @@ fit_soilNrandomslope <- add_criterion(fit_soilNrandomslope, 'loo')
 plot(conditional_effects(fit_soilNrandomslope, effects="soilN:field", re_formula = NULL), 
      line_args=list(linewidth=1.2, alpha = 0.2), theme = theme(legend.position = 'none'))
 
-variety_emmeans <- emmeans(fit_soilNrandomslope, ~ sex)
+variety_emmeans <- emmeans(fit_soilNrandomslope, ~ variety)
 
 gather_emmeans_draws(variety_emmeans) %>%
   ggplot(aes(x = .value, y = variety)) +
