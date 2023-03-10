@@ -758,4 +758,58 @@ You can use Stan without R as well, if that's your thing.
 
 # Exercises
 
-Coming soon!
+These three exercises should help you test your understanding of Bayesian statistics and using **brms**.
+
+### Exercise 1
+
+![](https://qdread.github.io/SEAStats/images/werewolf.jpg){width=25%}  
+
+Imagine you read in "The Field Guide to North American Werewolves" that about 1 in every 1000 people in North America is a werewolf. You have a werewolf detector that is 99% accurate (it correctly identifies werewolves 99% of the time, and correctly identifies people as not werewolves also 99% of the time). You point your werewolf detector at the mailman and it says "DANGER! WEREWOLF DETECTED!" You use Bayes' Theorem to calculate that the probability that the mailman really is a werewolf is 9%.
+
+**Question**: In this situation, what is the *data*, what is the *likelihood*, what is the *prior*, and what is the *posterior*?
+
+### Exercise 2
+
+Take a look at these two MCMC trace plots. Which one do you think indicates better model convergence? What would you recommend the researcher do in each case?
+
+#### Trace plot A
+
+```{r, include = FALSE}
+### Exercise 2
+set.seed(123)
+
+a <- expand.grid(
+  g1 = letters[1:3],
+  g2 = LETTERS[1:3],
+  x1 = 1:10
+ )
+
+a$y <- rnorm(90, 0, 5) + a$x1
+a$x2 <- 3 * a$x1
+
+fit <- brm(y ~ x1 + x2 + x1:x2 + (1+x1+x2|g1) + (1+x1+x2|g2), data = a, chains = 4, warmup = 10, iter = 1010, seed = 1, file = 'ex2bad')
+fitbetter <- brm(y ~ x1 + (1+x1|g1) + (1+x1|g2), data = a, chains = 4, warmup = 2000, iter = 3000, seed = 1, file = 'ex2good')
+```
+
+```{r, echo = FALSE}
+plot(fitbetter, variable = 'b_x1')
+```
+
+#### Trace plot B
+
+```{r, echo = FALSE}
+plot(fit, variable = 'b_x1')
+```
+
+
+### Exercise 3
+
+Add one or more interaction terms to the model that we have been working with. For example you could test for the presence of a variety-soil N interaction, or a rainfall-soil N interaction. Examine the model diagnostics, show or plot the parameter estimates, and use LOO cross-validation to compare this model to the ones we fit previously. What can you conclude?
+
+#### Exercise 3 hints
+
+- To include the variety-soil N interaction, add the term `+ variety:soilN` to the fixed-effects part of the model formula. 
+- To include the rainfall-soil N interaction, add the term `+ rainfall:soilN` to the fixed-effects part of the model formula.
+- To use LOO cross-validation, first use `add_criterion(model, 'loo')` and then use `loo_compare()`.
+
+<b><font size="6">[Click here for answers](brms_crash_course_answers)</font></b>

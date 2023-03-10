@@ -753,6 +753,125 @@ You can use Stan without R as well, if that's your thing.
 - [PyStan](https://pystan.readthedocs.io/) is a Python interface to Stan
 - [CmdStan](https://mc-stan.org/users/interfaces/cmdstan) is a shell interface to Stan that lets you run Stan models directly from the command line (if you're a glutton for punishment).
 
+\newpage
+
 # Exercises
 
-Coming soon!
+These three exercises should help you test your understanding of Bayesian statistics and using **brms**. Answers follow the exercises.
+
+### Exercise 1
+
+![](https://qdread.github.io/SEAStats/images/werewolf.jpg){width=25%}  
+
+Imagine you read in "The Field Guide to North American Werewolves" that about 1 in every 1000 people in North America is a werewolf. You have a werewolf detector that is 99% accurate (it correctly identifies werewolves 99% of the time, and correctly identifies people as not werewolves also 99% of the time). You point your werewolf detector at the mailman and it says "DANGER! WEREWOLF DETECTED!" You use Bayes' Theorem to calculate that the probability that the mailman really is a werewolf is 9%.
+
+**Question**: In this situation, what is the *data*, what is the *likelihood*, what is the *prior*, and what is the *posterior*?
+
+### Exercise 2
+
+Take a look at these two MCMC trace plots. Which one do you think indicates better model convergence? What would you recommend the researcher do in each case?
+
+#### Trace plot A
+
+```{r, include = FALSE}
+### Exercise 2
+set.seed(123)
+
+a <- expand.grid(
+  g1 = letters[1:3],
+  g2 = LETTERS[1:3],
+  x1 = 1:10
+ )
+
+a$y <- rnorm(90, 0, 5) + a$x1
+a$x2 <- 3 * a$x1
+
+fit <- brm(y ~ x1 + x2 + x1:x2 + (1+x1+x2|g1) + (1+x1+x2|g2), data = a, chains = 4, warmup = 10, iter = 1010, seed = 1, file = 'ex2bad')
+fitbetter <- brm(y ~ x1 + (1+x1|g1) + (1+x1|g2), data = a, chains = 4, warmup = 2000, iter = 3000, seed = 1, file = 'ex2good')
+```
+
+```{r, echo = FALSE}
+plot(fitbetter, variable = 'b_x1')
+```
+
+#### Trace plot B
+
+```{r, echo = FALSE}
+plot(fit, variable = 'b_x1')
+```
+
+
+### Exercise 3
+
+Add one or more interaction terms to the model that we have been working with. For example you could test for the presence of a variety-soil N interaction, or a rainfall-soil N interaction. Examine the model diagnostics, show or plot the parameter estimates, and use LOO cross-validation to compare this model to the ones we fit previously. What can you conclude?
+
+#### Exercise 3 hints
+
+- To include the variety-soil N interaction, add the term `+ variety:soilN` to the fixed-effects part of the model formula. 
+- To include the rainfall-soil N interaction, add the term `+ rainfall:soilN` to the fixed-effects part of the model formula.
+- To use LOO cross-validation, first use `add_criterion(model, 'loo')` and then use `loo_compare()`.
+
+\newpage
+
+## Answers
+
+### Exercise 1
+
+The *data* is the observation from your werewolf detector that the mailman is a werewolf. That is information you went out and collected, presumably to test the hypothesis that the mailman is a werewolf.
+
+The *likelihood* is the probability of the data given the model. In this case, it's the probability that the data point (the werewolf detector observing that the mailman is a werewolf) would be observed, given that the model is true (the model being the hypothesis that the mailman is a werewolf). As we know the detector correctly identifies werewolves 99% of the time, it's 0.99.
+
+The *prior* is the information from your field guide that 1 in every 1000 people is a werewolf. This is knowledge that you have before you set out to test whether anyone is a werewolf.
+
+The *posterior* is the final result: if we observe a positive werewolf test on an individual, given our prior knowledge that 1/1000 people are werewolves and the fact that our test is 99% accurate for both positive and negative results, the posterior probability that the mailman is a werewolf is 9%.
+
+Incidentally, this seems like a very low probability but it can be demonstrated using Bayes' Theorem. See the [worked example on the Wikipedia page on Bayes' Theorem](https://en.wikipedia.org/wiki/Bayes%27_theorem#Examples). It uses drug testing as an example, which is not as fun as werewolf testing, but the math is the same.
+
+### Exercise 2
+
+Trace plot A resembles a "hairy caterpillar," representing good model convergence. All Markov chains have arrived at the correct solution and are moving back and forth around it. The amount they go back and forth is proportional to the uncertainty we have about the value of the parameter.
+
+In trace plot B, some of the Markov chains show trends in one direction or another represents poor model convergence. The chains are still moving around trying to find the correct solution. They are not mixing well, meaning they are not moving back and forth with the same stationary distribution.
+
+In the first case, we can tell the researcher they can use the posterior distribution to make some inferences. They can do things like calculate the median and quantiles of the distribution, and make predictions.
+
+In the second case, we would recommend the researcher to either run the MCMC for a greater number of iterations, or change the prior distributions to constrain the chains to explore parameter space more narrowly so they are more likely to converge on the correct solution.
+
+### Exercise 3
+
+Here is how you would proceed if you wanted to add both interaction terms to the model. This adds the interaction terms to the last model we fit that included a random slope with respect to soil N for each field.
+
+```{r, results = 'hide', message = FALSE}
+fit_withinteractions <- brm(yield ~ 1 + variety + soilN + rainfall + variety:soilN + soilN:rainfall + (1 + soilN | field),
+                            data = yield_data,
+                            prior = c(prior(normal(0,5), class = b)),
+                            chains = 4,
+                            iter = 4000,
+                            warmup = 3000,
+                            seed = 999,
+                            file = 'fit_withinteractions')
+```
+
+Then, to examine the model diagnostics, look at the trace plots and the posterior predictive check plot (output not shown here). We should see "hairy caterpillar" traceplots and a posterior predictive check plot where the fitted values taken from the posterior have a similar distribution to the data.
+
+```{r, eval = FALSE}
+plot(fit_withinteractions)
+pp_check(fit_withinteractions)
+```
+
+Next, look at the model summary. This will show you that the R-hat statistics are close to 1 to further confirm the model converged. That means we can make inferences based on the parameter estimates. 
+
+```{r, warning = FALSE}
+summary(fit_withinteractions)
+```
+
+Based on this summary, we can see, for example, that there is some evidence for a negative interaction between soil N and rainfall. This indicates that as soil N increases, the effect of rainfall on yield decreases, and conversely, that as rainfall increases, the effect of soil N on yield decreases.
+
+Finally, we can use LOO cross-validation to compare the model to others. In this case I will just compare the model with both interaction terms to the random-slope model with only the three main effects and no interaction terms that we fit during the main part of the lesson.
+
+```{r, message = FALSE}
+fit_withinteractions <- add_criterion(fit_withinteractions, 'loo')
+loo_compare(fit_withinteractions, fit_soilNrandomslope)
+```
+
+This shows us that the fit that includes the two interaction terms performs better despite the addition of two fixed effect parameters.
