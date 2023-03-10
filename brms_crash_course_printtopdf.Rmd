@@ -767,6 +767,8 @@ Imagine you read in "The Field Guide to North American Werewolves" that about 1 
 
 **Question**: In this situation, what is the *data*, what is the *likelihood*, what is the *prior*, and what is the *posterior*?
 
+\newpage
+
 ### Exercise 2
 
 Take a look at these two MCMC trace plots. Which one do you think indicates better model convergence? What would you recommend the researcher do in each case?
@@ -790,16 +792,17 @@ fit <- brm(y ~ x1 + x2 + x1:x2 + (1+x1+x2|g1) + (1+x1+x2|g2), data = a, chains =
 fitbetter <- brm(y ~ x1 + (1+x1|g1) + (1+x1|g2), data = a, chains = 4, warmup = 2000, iter = 3000, seed = 1, file = 'ex2good')
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, fig.height = 3, fig.width = 6}
 plot(fitbetter, variable = 'b_x1')
 ```
 
 #### Trace plot B
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, fig.height = 3, fig.width = 6}
 plot(fit, variable = 'b_x1')
 ```
 
+\newpage
 
 ### Exercise 3
 
